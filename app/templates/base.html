@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es" x-data="{ sidebarOpen: true }">
+<html lang="es" x-data="{ sidebarOpen: true, usuario: { nombre: '', email: '', plan: '' } }" x-init="cargarUsuario()">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -41,29 +41,29 @@
       ] %}
       {% for href, icon, label in nav_items %}
       <a href="{{ href }}"
-         class="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-400 hover:bg-gray-800 hover:text-white transition-colors group
-                {% if request.url.path == href %}bg-indigo-600/20 text-indigo-400{% endif %}">
+         class="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-400 hover:bg-gray-800 hover:text-white transition-colors
+                {% if request.url.path.rstrip('/') == href.rstrip('/') %}bg-indigo-600/20 text-indigo-400{% endif %}">
         <span class="text-xl flex-shrink-0">{{ icon }}</span>
         <span x-show="sidebarOpen" x-cloak class="text-sm font-medium">{{ label }}</span>
       </a>
       {% endfor %}
     </nav>
 
-    <!-- Usuario -->
+    <!-- Usuario (datos cargados via JS) -->
     <div class="px-2 py-4 border-t border-gray-800">
       <div class="flex items-center gap-3 px-3 py-2 rounded-lg">
-        <div class="w-8 h-8 bg-indigo-500 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0">
-          {{ tenant.nombre_empresa[0].upper() if tenant else "U" }}
-        </div>
+        <div class="w-8 h-8 bg-indigo-500 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
+             x-text="usuario.nombre ? usuario.nombre[0].toUpperCase() : 'U'">U</div>
         <div x-show="sidebarOpen" x-cloak class="min-w-0">
-          <p class="text-sm font-medium text-white truncate">{{ tenant.nombre_empresa if tenant else "Usuario" }}</p>
-          <p class="text-xs text-gray-500 truncate">{{ tenant.email if tenant else "" }}</p>
+          <p class="text-sm font-medium text-white truncate" x-text="usuario.nombre || 'Cargando...'"></p>
+          <p class="text-xs text-gray-500 truncate" x-text="usuario.email"></p>
         </div>
       </div>
-      <a href="/auth/iniciar-sesion" class="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-500 hover:text-red-400 hover:bg-gray-800 transition-colors mt-1">
+      <button @click="cerrarSesion()"
+              class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-gray-500 hover:text-red-400 hover:bg-gray-800 transition-colors mt-1">
         <span class="text-xl flex-shrink-0">🚪</span>
         <span x-show="sidebarOpen" x-cloak class="text-sm">Cerrar sesión</span>
-      </a>
+      </button>
     </div>
 
     <!-- Toggle sidebar -->
@@ -81,25 +81,9 @@
       <h1 class="text-lg font-semibold text-white">{% block page_title %}Inicio{% endblock %}</h1>
       <div class="flex items-center gap-3">
         {% block topbar_actions %}{% endblock %}
-        <span class="text-sm text-gray-500">{{ tenant.estado_suscripcion | title if tenant else "" }}</span>
+        <span class="text-xs text-gray-600 bg-gray-800 px-2 py-1 rounded-full" x-text="usuario.plan" x-show="usuario.plan" x-cloak></span>
       </div>
     </header>
-
-    <!-- Flash messages -->
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        <div class="px-6 pt-4 space-y-2">
-          {% for category, message in messages %}
-          <div class="px-4 py-3 rounded-lg text-sm
-            {% if category == 'error' %}bg-red-900/50 text-red-300 border border-red-800
-            {% elif category == 'success' %}bg-green-900/50 text-green-300 border border-green-800
-            {% else %}bg-blue-900/50 text-blue-300 border border-blue-800{% endif %}">
-            {{ message }}
-          </div>
-          {% endfor %}
-        </div>
-      {% endif %}
-    {% endwith %}
 
     <!-- Página -->
     <main class="flex-1 p-6">
@@ -112,6 +96,33 @@
   </div>
 
   <script src="/static/js/venbot.js"></script>
+  <script>
+    // Cargado en todas las páginas del dashboard
+    async function cargarUsuario() {
+      requireAuth();
+      try {
+        const resp = await apiFetch('/tenant/me');
+        if (resp && resp.ok) {
+          const data = await resp.json();
+          // Actualizar el componente Alpine del body
+          const el = document.querySelector('html');
+          if (el && el._x_dataStack) {
+            const scope = el._x_dataStack[0];
+            scope.usuario = {
+              nombre: data.nombre_empresa,
+              email: data.email,
+              plan: data.estado_suscripcion,
+            };
+          }
+        }
+      } catch {}
+    }
+
+    function cerrarSesion() {
+      AUTH.clear();
+      window.location.href = '/auth/iniciar-sesion';
+    }
+  </script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

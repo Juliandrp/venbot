@@ -11,6 +11,7 @@ celery_app = Celery(
         "app.workers.shipping_tracker",
         "app.workers.notifications",
         "app.workers.content_pipeline",
+        "app.workers.bot_processor",
     ],
 )
 

@@ -13,6 +13,15 @@ router = APIRouter(prefix="/productos", tags=["Productos"])
 templates = Jinja2Templates(directory="app/templates")
 
 
+# ─── Vistas HTML (antes de rutas con parámetros) ─────────────
+
+@router.get("/vista/lista")
+async def vista_productos(request: Request):
+    return templates.TemplateResponse("products/index.html", {"request": request})
+
+
+# ─── API JSON ─────────────────────────────────────────────────
+
 @router.get("/", response_model=ProductListOut)
 async def listar_productos(
     skip: int = 0,
@@ -21,7 +30,9 @@ async def listar_productos(
     db: AsyncSession = Depends(get_db),
 ):
     count_result = await db.execute(
-        select(func.count()).select_from(Product).where(Product.tenant_id == tenant.id, Product.activo == True)
+        select(func.count()).select_from(Product).where(
+            Product.tenant_id == tenant.id, Product.activo == True
+        )
     )
     total = count_result.scalar()
 
@@ -46,7 +57,6 @@ async def crear_producto(
     await db.commit()
     await db.refresh(producto)
 
-    # Disparar pipeline de contenido en background
     from app.workers.content_pipeline import generar_contenido_producto
     generar_contenido_producto.delay(str(producto.id), str(tenant.id))
 
@@ -104,7 +114,10 @@ async def publicar_en_shopify(
     shopify_token = decrypt_secret(config.shopify_access_token_enc)
     shopify = ShopifyService(config.shopify_store_url, shopify_token)
 
-    descripcion_html = f"<p>{contenido.descripcion_seo}</p>" if contenido and contenido.descripcion_seo else f"<p>{producto.descripcion_input or producto.nombre}</p>"
+    descripcion_html = (
+        f"<p>{contenido.descripcion_seo}</p>" if contenido and contenido.descripcion_seo
+        else f"<p>{producto.descripcion_input or producto.nombre}</p>"
+    )
     if contenido and contenido.bullet_points:
         items_html = "".join(f"<li>{b}</li>" for b in contenido.bullet_points)
         descripcion_html += f"<ul>{items_html}</ul>"
@@ -116,7 +129,7 @@ async def publicar_en_shopify(
         imagenes += contenido.imagenes_generadas
     imagenes = imagenes[:10]
 
-    titulo = (contenido.titulo_seo if contenido and contenido.titulo_seo else producto.nombre)
+    titulo = contenido.titulo_seo if contenido and contenido.titulo_seo else producto.nombre
 
     resultado = await shopify.publicar_producto(
         titulo=titulo,
@@ -172,10 +185,3 @@ async def eliminar_producto(
         raise HTTPException(status_code=404, detail="Producto no encontrado")
     producto.activo = False
     await db.commit()
-
-
-# ─── Vistas HTML ─────────────────────────────────────────────
-
-@router.get("/vista/lista")
-async def vista_productos(request: Request, tenant: Tenant = Depends(get_current_tenant)):
-    return templates.TemplateResponse("products/index.html", {"request": request, "tenant": tenant})

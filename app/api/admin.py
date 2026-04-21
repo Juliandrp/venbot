@@ -74,5 +74,5 @@ async def metricas_globales(
 
 
 @router.get("/")
-async def vista_admin(request: Request, _admin: Tenant = Depends(get_current_superadmin)):
-    return templates.TemplateResponse("admin/index.html", {"request": request, "admin": _admin})
+async def vista_admin(request: Request):
+    return templates.TemplateResponse("admin/index.html", {"request": request})
