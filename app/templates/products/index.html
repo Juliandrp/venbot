@@ -10,7 +10,7 @@
 {% endblock %}
 
 {% block content %}
-<div x-data="productos()" x-init="cargar()" @abrir-modal-producto.window="abrirModal()">
+<div x-data="productos()" x-init="iniciar()" @abrir-modal-producto.window="abrirModal()">
 
   <!-- Modal nuevo producto -->
   <div x-show="modalNuevo" x-cloak
@@ -172,9 +172,15 @@
             </td>
             <td class="px-6 py-4 text-gray-300" x-text="p.precio ? '$' + p.precio : '—'"></td>
             <td class="px-6 py-4">
-              <span :class="p.contenido_generado ? 'bg-green-900/50 text-green-400 border-green-800' : 'bg-yellow-900/50 text-yellow-400 border-yellow-800'"
-                    class="px-2 py-1 rounded-full text-xs border"
-                    x-text="p.contenido_generado ? '✓ Listo' : '⏳ Generando'"></span>
+              <span x-show="p.contenido_generado"
+                    class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs border bg-green-900/50 text-green-400 border-green-800">
+                ✓ Listo
+              </span>
+              <span x-show="!p.contenido_generado"
+                    class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs border bg-yellow-900/30 text-yellow-400 border-yellow-800/50">
+                <span class="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse"></span>
+                Generando con IA...
+              </span>
             </td>
             <td class="px-6 py-4">
               <a x-show="p.shopify_url" :href="p.shopify_url" target="_blank"
@@ -205,7 +211,25 @@
       subiendo: false, cargandoLista: true,
       error: '', progreso: 0, mensajeProgreso: '',
       archivos: [], previews: [],
+      _refreshTimer: null,
       form: { nombre: '', descripcion_input: '', precio: '', inventario: 0 },
+
+      iniciar() {
+        this.cargar();
+      },
+
+      _programarRefresh() {
+        clearInterval(this._refreshTimer);
+        const pendientes = this.items.some(p => !p.contenido_generado);
+        if (pendientes) {
+          this._refreshTimer = setInterval(async () => {
+            await this.cargar();
+            if (this.items.every(p => p.contenido_generado)) {
+              clearInterval(this._refreshTimer);
+            }
+          }, 15000); // refresca cada 15s mientras haya pendientes
+        }
+      },
 
       abrirModal() {
         this.modalNuevo = true;
@@ -318,6 +342,7 @@
           const data = await resp.json();
           this.items = data.items;
           this.total = data.total;
+          this._programarRefresh();
         } finally { this.cargandoLista = false; }
       },
 

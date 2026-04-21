@@ -1,12 +1,121 @@
 {% extends "base.html" %}
 {% block title %}Configuración{% endblock %}
-{% block page_title %}⚙️ Configuración de APIs{% endblock %}
+{% block page_title %}⚙️ Configuración{% endblock %}
 
 {% block content %}
 <div x-data="config()" x-init="cargar()">
   <div class="max-w-3xl space-y-6">
 
-    <!-- Shopify -->
+    <!-- ── Inteligencia Artificial ─────────────────────────────────── -->
+    <div class="bg-gray-900 border border-indigo-800/50 rounded-2xl p-6">
+      <h2 class="font-semibold text-white mb-1 flex items-center gap-2">
+        <span class="text-xl">🤖</span> Inteligencia Artificial
+      </h2>
+      <p class="text-xs text-gray-500 mb-5">
+        Selecciona qué IA usará tu cuenta para generar contenido y videos.
+        Si ingresas tu propia API key, se usará en lugar de la clave de la plataforma.
+      </p>
+
+      <!-- IA para contenido -->
+      <div class="mb-5">
+        <label class="block text-sm font-medium text-gray-300 mb-2">IA para contenido (copy, SEO, descripciones)</label>
+        <div class="grid grid-cols-3 gap-3 mb-3">
+          <template x-for="op in [{val:'claude', label:'Claude', sub:'Anthropic', icon:'🔮'},
+                                   {val:'gemini', label:'Gemini 2 Flash', sub:'Google', icon:'✨'},
+                                   {val:'openai', label:'ChatGPT', sub:'OpenAI', icon:'🧠'}]">
+            <button type="button"
+                    @click="form.ai_provider = op.val"
+                    :class="form.ai_provider === op.val
+                      ? 'border-indigo-500 bg-indigo-600/20 text-white'
+                      : 'border-gray-700 bg-gray-800 text-gray-400 hover:border-gray-500'"
+                    class="border rounded-xl p-3 text-left transition-all">
+              <div class="text-lg mb-0.5" x-text="op.icon"></div>
+              <div class="text-sm font-medium" x-text="op.label"></div>
+              <div class="text-xs opacity-60" x-text="op.sub"></div>
+            </button>
+          </template>
+        </div>
+
+        <!-- Key dinámica según selección -->
+        <div x-show="form.ai_provider === 'claude'">
+          <label class="block text-xs text-gray-500 mb-1">
+            API Key de Anthropic
+            <span x-show="cfg.tiene_anthropic_key" class="text-green-400 ml-1">✓ configurada</span>
+          </label>
+          <input type="password" x-model="form.anthropic_api_key"
+                 class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 text-sm"
+                 :placeholder="cfg.tiene_anthropic_key ? '••••••••  (dejar vacío para no cambiar)' : 'sk-ant-...'" />
+        </div>
+        <div x-show="form.ai_provider === 'gemini'">
+          <label class="block text-xs text-gray-500 mb-1">
+            API Key de Google Gemini
+            <span x-show="cfg.tiene_gemini_key" class="text-green-400 ml-1">✓ configurada</span>
+          </label>
+          <input type="password" x-model="form.gemini_api_key"
+                 class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 text-sm"
+                 :placeholder="cfg.tiene_gemini_key ? '••••••••  (dejar vacío para no cambiar)' : 'AIzaSy...'" />
+        </div>
+        <div x-show="form.ai_provider === 'openai'">
+          <label class="block text-xs text-gray-500 mb-1">
+            API Key de OpenAI (ChatGPT)
+            <span x-show="cfg.tiene_openai_key" class="text-green-400 ml-1">✓ configurada</span>
+          </label>
+          <input type="password" x-model="form.openai_api_key"
+                 class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 text-sm"
+                 :placeholder="cfg.tiene_openai_key ? '••••••••  (dejar vacío para no cambiar)' : 'sk-...'" />
+        </div>
+      </div>
+
+      <!-- IA para video -->
+      <div>
+        <label class="block text-sm font-medium text-gray-300 mb-2">IA para videos de producto</label>
+        <div class="grid grid-cols-2 gap-3 mb-3">
+          <template x-for="op in [{val:'kling', label:'Kling AI', sub:'Kuaishou · Recomendado', icon:'🎬'},
+                                   {val:'heygen', label:'HeyGen', sub:'Avatar + voz', icon:'🎤'}]">
+            <button type="button"
+                    @click="form.video_provider = op.val"
+                    :class="form.video_provider === op.val
+                      ? 'border-indigo-500 bg-indigo-600/20 text-white'
+                      : 'border-gray-700 bg-gray-800 text-gray-400 hover:border-gray-500'"
+                    class="border rounded-xl p-3 text-left transition-all">
+              <div class="text-lg mb-0.5" x-text="op.icon"></div>
+              <div class="text-sm font-medium" x-text="op.label"></div>
+              <div class="text-xs opacity-60" x-text="op.sub"></div>
+            </button>
+          </template>
+        </div>
+
+        <div x-show="form.video_provider === 'kling'">
+          <label class="block text-xs text-gray-500 mb-1">
+            API Key de Kling AI
+            <span x-show="cfg.tiene_kling_key" class="text-green-400 ml-1">✓ configurada</span>
+          </label>
+          <input type="password" x-model="form.kling_api_key"
+                 class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 text-sm"
+                 :placeholder="cfg.tiene_kling_key ? '••••••••  (dejar vacío para no cambiar)' : 'tu-kling-api-key'" />
+          <p class="text-xs text-gray-600 mt-1">Obtén tu key en <span class="text-indigo-400">klingai.com → API</span></p>
+        </div>
+        <div x-show="form.video_provider === 'heygen'">
+          <label class="block text-xs text-gray-500 mb-1">
+            API Key de HeyGen
+            <span x-show="cfg.tiene_heygen_key" class="text-green-400 ml-1">✓ configurada</span>
+          </label>
+          <input type="password" x-model="form.heygen_api_key"
+                 class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 text-sm"
+                 :placeholder="cfg.tiene_heygen_key ? '••••••••  (dejar vacío para no cambiar)' : 'tu-heygen-api-key'" />
+        </div>
+      </div>
+
+      <!-- Nota sobre DALL-E -->
+      <div class="mt-4 p-3 bg-gray-800/60 rounded-lg border border-gray-700 text-xs text-gray-400">
+        🖼️ <strong class="text-gray-300">Imágenes IA (DALL-E 3):</strong>
+        Se generan con OpenAI independientemente del proveedor de contenido seleccionado.
+        <span x-show="cfg.tiene_openai_key" class="text-green-400">✓ Key propia configurada.</span>
+        <span x-show="!cfg.tiene_openai_key">Si no tienes key propia, se usa la de la plataforma.</span>
+      </div>
+    </div>
+
+    <!-- ── Shopify ─────────────────────────────────────────────────── -->
     <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
       <h2 class="font-semibold text-white mb-4 flex items-center gap-2">
         <span class="text-xl">🛍️</span> Shopify
@@ -19,7 +128,7 @@
                  placeholder="mi-tienda.myshopify.com" />
         </div>
         <div>
-          <label class="block text-sm text-gray-400 mb-1">Access Token (cifrado)</label>
+          <label class="block text-sm text-gray-400 mb-1">Access Token</label>
           <input type="password" x-model="form.shopify_access_token"
                  class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
                  placeholder="shpat_••••••••" />
@@ -27,10 +136,10 @@
       </div>
     </div>
 
-    <!-- Meta Ads -->
+    <!-- ── Meta Ads ────────────────────────────────────────────────── -->
     <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
       <h2 class="font-semibold text-white mb-4 flex items-center gap-2">
-        <span class="text-xl">📣</span> Meta Ads (Facebook/Instagram)
+        <span class="text-xl">📣</span> Meta Ads (Facebook / Instagram)
       </h2>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
@@ -62,7 +171,7 @@
       </div>
     </div>
 
-    <!-- WhatsApp -->
+    <!-- ── WhatsApp ───────────────────────────────────────────────── -->
     <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
       <h2 class="font-semibold text-white mb-4 flex items-center gap-2">
         <span class="text-xl">📱</span> WhatsApp Business API
@@ -83,14 +192,12 @@
           <input type="text" x-model="form.waba_verify_token"
                  class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
                  placeholder="mi_token_secreto_123" />
-          <p class="text-xs text-gray-600 mt-1">
-            URL de webhook: <span class="font-mono text-indigo-400" x-text="location.origin + '/bot/whatsapp/webhook/TU-TENANT-ID'"></span>
-          </p>
+          <p class="text-xs text-gray-600 mt-1">URL webhook: <span class="font-mono text-indigo-400" x-text="location.origin + '/bot/whatsapp/webhook/TU-TENANT-ID'"></span></p>
         </div>
       </div>
     </div>
 
-    <!-- Dropi -->
+    <!-- ── Dropi ──────────────────────────────────────────────────── -->
     <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
       <h2 class="font-semibold text-white mb-4 flex items-center gap-2">
         <span class="text-xl">📦</span> Dropi
@@ -109,7 +216,7 @@
       </div>
     </div>
 
-    <!-- SMTP -->
+    <!-- ── SMTP ───────────────────────────────────────────────────── -->
     <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
       <h2 class="font-semibold text-white mb-4 flex items-center gap-2">
         <span class="text-xl">📧</span> Correo SMTP
@@ -153,15 +260,16 @@
       </div>
     </div>
 
-    <!-- Guardar -->
-    <div class="flex items-center gap-4">
-      <button @click="guardar" :disabled="guardando"
+    <!-- ── Guardar ────────────────────────────────────────────────── -->
+    <div class="flex items-center gap-4 pb-8">
+      <button @click="guardar()" :disabled="guardando"
               class="px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl transition-colors disabled:opacity-50">
         <span x-text="guardando ? 'Guardando...' : 'Guardar configuración'"></span>
       </button>
-      <span x-show="guardadoOk" class="text-green-400 text-sm">✓ Guardado correctamente</span>
+      <span x-show="guardadoOk" x-transition class="text-green-400 text-sm">✓ Guardado correctamente</span>
       <span x-show="errorMsg" class="text-red-400 text-sm" x-text="errorMsg"></span>
     </div>
+
   </div>
 </div>
 {% endblock %}
@@ -173,16 +281,55 @@
 
   function config() {
     return {
-      form: {}, guardando: false, guardadoOk: false, errorMsg: '',
+      form: {
+        ai_provider: 'claude', video_provider: 'kling',
+        anthropic_api_key: '', gemini_api_key: '', openai_api_key: '',
+        kling_api_key: '', heygen_api_key: '',
+        shopify_store_url: '', shopify_access_token: '',
+        meta_app_id: '', meta_app_secret: '', meta_access_token: '',
+        meta_ad_account_id: '', meta_pixel_id: '',
+        waba_phone_number_id: '', waba_token: '', waba_verify_token: '',
+        dropi_api_key: '', dropi_store_id: '',
+        smtp_host: '', smtp_port: '', smtp_user: '', smtp_password: '',
+        smtp_from_name: '', smtp_from_email: '', smtp_use_tls: true,
+      },
+      cfg: {
+        tiene_anthropic_key: false, tiene_gemini_key: false,
+        tiene_openai_key: false, tiene_kling_key: false, tiene_heygen_key: false,
+      },
+      guardando: false, guardadoOk: false, errorMsg: '',
+
       async cargar() {
         try {
           const resp = await fetch('/tenant/config', { headers: { Authorization: 'Bearer ' + token } });
           if (resp.ok) {
             const data = await resp.json();
-            this.form = { ...data };
+            // Actualizar cfg (indicadores) y form (valores de texto plano)
+            this.cfg = {
+              tiene_anthropic_key: data.tiene_anthropic_key,
+              tiene_gemini_key: data.tiene_gemini_key,
+              tiene_openai_key: data.tiene_openai_key,
+              tiene_kling_key: data.tiene_kling_key,
+              tiene_heygen_key: data.tiene_heygen_key,
+            };
+            this.form.ai_provider = data.ai_provider || 'claude';
+            this.form.video_provider = data.video_provider || 'kling';
+            this.form.shopify_store_url = data.shopify_store_url || '';
+            this.form.meta_ad_account_id = data.meta_ad_account_id || '';
+            this.form.meta_pixel_id = data.meta_pixel_id || '';
+            this.form.waba_phone_number_id = data.waba_phone_number_id || '';
+            this.form.waba_verify_token = data.waba_verify_token || '';
+            this.form.dropi_store_id = data.dropi_store_id || '';
+            this.form.smtp_host = data.smtp_host || '';
+            this.form.smtp_port = data.smtp_port || '';
+            this.form.smtp_user = data.smtp_user || '';
+            this.form.smtp_from_name = data.smtp_from_name || '';
+            this.form.smtp_from_email = data.smtp_from_email || '';
+            this.form.smtp_use_tls = data.smtp_use_tls ?? true;
           }
         } catch {}
       },
+
       async guardar() {
         this.guardando = true; this.guardadoOk = false; this.errorMsg = '';
         try {
@@ -191,7 +338,23 @@
             headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
             body: JSON.stringify(this.form),
           });
-          if (!resp.ok) { this.errorMsg = 'Error al guardar'; return; }
+          if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            this.errorMsg = err.detail || 'Error al guardar'; return;
+          }
+          const data = await resp.json();
+          // Actualizar indicadores después de guardar
+          this.cfg = {
+            tiene_anthropic_key: data.tiene_anthropic_key,
+            tiene_gemini_key: data.tiene_gemini_key,
+            tiene_openai_key: data.tiene_openai_key,
+            tiene_kling_key: data.tiene_kling_key,
+            tiene_heygen_key: data.tiene_heygen_key,
+          };
+          // Limpiar campos de keys para no reenviar
+          ['anthropic_api_key','gemini_api_key','openai_api_key','kling_api_key','heygen_api_key',
+           'shopify_access_token','meta_app_id','meta_app_secret','meta_access_token',
+           'waba_token','dropi_api_key','smtp_password'].forEach(k => this.form[k] = '');
           this.guardadoOk = true;
           setTimeout(() => this.guardadoOk = false, 3000);
         } finally { this.guardando = false; }

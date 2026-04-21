@@ -46,20 +46,44 @@ class TenantConfigIn(BaseModel):
     smtp_from_name: str | None = None
     smtp_use_tls: bool = True
 
-    # AI keys opcionales
+    # IA — selección de proveedor
+    ai_provider: str | None = None       # claude | gemini | openai
+    video_provider: str | None = None    # kling | heygen
+
+    # IA — claves propias del tenant (opcionales, cifradas al guardar)
     anthropic_api_key: str | None = None
+    gemini_api_key: str | None = None
+    openai_api_key: str | None = None
+    kling_api_key: str | None = None
     heygen_api_key: str | None = None
 
 
 class TenantConfigOut(BaseModel):
-    shopify_store_url: str | None
-    meta_ad_account_id: str | None
-    meta_pixel_id: str | None
-    waba_phone_number_id: str | None
-    dropi_store_id: str | None
-    smtp_host: str | None
-    smtp_from_email: str | None
-    smtp_from_name: str | None
-    updated_at: datetime
+    # Integraciones
+    shopify_store_url: str | None = None
+    meta_ad_account_id: str | None = None
+    meta_pixel_id: str | None = None
+    waba_phone_number_id: str | None = None
+    dropi_store_id: str | None = None
+    smtp_host: str | None = None
+    smtp_port: int | None = None
+    smtp_user: str | None = None
+    smtp_from_email: str | None = None
+    smtp_from_name: str | None = None
+    smtp_use_tls: bool = True
+    waba_verify_token: str | None = None
 
-    model_config = {"from_attributes": True}
+    # IA — proveedores seleccionados
+    ai_provider: str = "claude"
+    video_provider: str = "kling"
+
+    # Indicadores de si la key está configurada (nunca devolvemos el valor real)
+    tiene_anthropic_key: bool = False
+    tiene_gemini_key: bool = False
+    tiene_openai_key: bool = False
+    tiene_kling_key: bool = False
+    tiene_heygen_key: bool = False
+
+    updated_at: datetime | None = None
+
+    model_config = {"from_attributes": False}

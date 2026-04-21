@@ -23,8 +23,9 @@ async def obtener_config(
     result = await db.execute(select(TenantConfig).where(TenantConfig.tenant_id == tenant.id))
     config = result.scalar_one_or_none()
     if not config:
-        raise HTTPException(status_code=404, detail="Configuración no encontrada")
-    return config
+        # Devolver configuración vacía con defaults
+        return TenantConfigOut(updated_at=None)
+    return _config_to_out(config)
 
 
 @router.put("/config", response_model=TenantConfigOut)
@@ -39,49 +40,79 @@ async def actualizar_config(
         config = TenantConfig(tenant_id=tenant.id)
         db.add(config)
 
-    # Campos no sensibles
-    if data.shopify_store_url is not None:
-        config.shopify_store_url = data.shopify_store_url
-    if data.meta_ad_account_id is not None:
-        config.meta_ad_account_id = data.meta_ad_account_id
-    if data.meta_pixel_id is not None:
-        config.meta_pixel_id = data.meta_pixel_id
-    if data.waba_phone_number_id is not None:
-        config.waba_phone_number_id = data.waba_phone_number_id
-    if data.waba_verify_token is not None:
-        config.waba_verify_token = data.waba_verify_token
-    if data.dropi_store_id is not None:
-        config.dropi_store_id = data.dropi_store_id
-    if data.smtp_host is not None:
-        config.smtp_host = data.smtp_host
-    if data.smtp_port is not None:
-        config.smtp_port = data.smtp_port
-    if data.smtp_user is not None:
-        config.smtp_user = data.smtp_user
-    if data.smtp_from_email is not None:
-        config.smtp_from_email = data.smtp_from_email
-    if data.smtp_from_name is not None:
-        config.smtp_from_name = data.smtp_from_name
+    # Campos de texto plano
+    _plain = [
+        ("shopify_store_url", "shopify_store_url"),
+        ("meta_ad_account_id", "meta_ad_account_id"),
+        ("meta_pixel_id", "meta_pixel_id"),
+        ("waba_phone_number_id", "waba_phone_number_id"),
+        ("waba_verify_token", "waba_verify_token"),
+        ("dropi_store_id", "dropi_store_id"),
+        ("smtp_host", "smtp_host"),
+        ("smtp_port", "smtp_port"),
+        ("smtp_user", "smtp_user"),
+        ("smtp_from_email", "smtp_from_email"),
+        ("smtp_from_name", "smtp_from_name"),
+    ]
+    for in_field, model_field in _plain:
+        value = getattr(data, in_field, None)
+        if value is not None:
+            setattr(config, model_field, value)
+
     config.smtp_use_tls = data.smtp_use_tls
 
+    # Proveedores IA
+    if data.ai_provider in ("claude", "gemini", "openai"):
+        config.ai_provider = data.ai_provider
+    if data.video_provider in ("kling", "heygen"):
+        config.video_provider = data.video_provider
+
     # Campos cifrados
-    _enc_fields = [
-        ("shopify_api_key", "shopify_api_key_enc"),
-        ("shopify_access_token", "shopify_access_token_enc"),
-        ("meta_app_id", "meta_app_id_enc"),
-        ("meta_app_secret", "meta_app_secret_enc"),
-        ("meta_access_token", "meta_access_token_enc"),
-        ("waba_token", "waba_token_enc"),
-        ("dropi_api_key", "dropi_api_key_enc"),
-        ("smtp_password", "smtp_password_enc"),
-        ("anthropic_api_key", "anthropic_api_key_enc"),
-        ("heygen_api_key", "heygen_api_key_enc"),
+    _enc = [
+        ("shopify_api_key",     "shopify_api_key_enc"),
+        ("shopify_access_token","shopify_access_token_enc"),
+        ("meta_app_id",         "meta_app_id_enc"),
+        ("meta_app_secret",     "meta_app_secret_enc"),
+        ("meta_access_token",   "meta_access_token_enc"),
+        ("waba_token",          "waba_token_enc"),
+        ("dropi_api_key",       "dropi_api_key_enc"),
+        ("smtp_password",       "smtp_password_enc"),
+        ("anthropic_api_key",   "anthropic_api_key_enc"),
+        ("gemini_api_key",      "gemini_api_key_enc"),
+        ("openai_api_key",      "openai_api_key_enc"),
+        ("kling_api_key",       "kling_api_key_enc"),
+        ("heygen_api_key",      "heygen_api_key_enc"),
     ]
-    for input_field, model_field in _enc_fields:
-        value = getattr(data, input_field, None)
+    for in_field, model_field in _enc:
+        value = getattr(data, in_field, None)
         if value:
             setattr(config, model_field, encrypt_secret(value))
 
     await db.commit()
     await db.refresh(config)
-    return config
+    return _config_to_out(config)
+
+
+def _config_to_out(config: TenantConfig) -> TenantConfigOut:
+    return TenantConfigOut(
+        shopify_store_url=config.shopify_store_url,
+        meta_ad_account_id=config.meta_ad_account_id,
+        meta_pixel_id=config.meta_pixel_id,
+        waba_phone_number_id=config.waba_phone_number_id,
+        waba_verify_token=config.waba_verify_token,
+        dropi_store_id=config.dropi_store_id,
+        smtp_host=config.smtp_host,
+        smtp_port=config.smtp_port,
+        smtp_user=config.smtp_user,
+        smtp_from_email=config.smtp_from_email,
+        smtp_from_name=config.smtp_from_name,
+        smtp_use_tls=config.smtp_use_tls,
+        ai_provider=config.ai_provider or "claude",
+        video_provider=config.video_provider or "kling",
+        tiene_anthropic_key=bool(config.anthropic_api_key_enc),
+        tiene_gemini_key=bool(config.gemini_api_key_enc),
+        tiene_openai_key=bool(config.openai_api_key_enc),
+        tiene_kling_key=bool(config.kling_api_key_enc),
+        tiene_heygen_key=bool(config.heygen_api_key_enc),
+        updated_at=config.updated_at,
+    )
