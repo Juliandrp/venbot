@@ -2,10 +2,10 @@
 Worker: pipeline completo de generación de contenido IA para productos.
 
 Flujo:
-  1. Claude → título SEO, descripción, bullet points, variantes de copy, guión de video
-  2. DALL-E 3 → imágenes de producto (3 variantes)
-  3. HeyGen → video con el guión generado
-  4. (Opcional) Shopify → publicar el producto si la integración está configurada
+  1. IA texto  → Claude | Gemini (free) | OpenAI
+  2. Imágenes  → Imagen3 | DALL-E3 si hay key; Pollinations/Flux si no (gratis)
+  3. Video     → Kling | HeyGen si hay key; omitido si no
+  4. Shopify   → publicar si está configurado y hay precio
 """
 import asyncio
 import uuid
@@ -55,14 +55,53 @@ async def _pipeline(product_id: str, tenant_id: str):
             contenido = ProductContent(product_id=producto.id)
             db.add(contenido)
 
-        # ── Paso 1: IA — copy y guión (Claude o Gemini según config del tenant) ──
-        ai_provider = (config.ai_provider if config else None) or "claude"
+        # ── Paso 1: IA — copy y guión ──────────────────────────────────────────
+        # Prioridad: proveedor configurado con key → Gemini free como fallback universal
+        from app.config import settings as _settings
+        ai_provider = (config.ai_provider if config else None) or "gemini"
 
         image_urls = list(producto.imagenes_originales or [])
+        datos = None
 
-        if ai_provider == "gemini":
+        if ai_provider == "claude":
+            anthropic_key = None
+            if config and config.anthropic_api_key_enc:
+                anthropic_key = decrypt_secret(config.anthropic_api_key_enc)
+            elif _settings.anthropic_api_key:
+                anthropic_key = _settings.anthropic_api_key
+            if anthropic_key:
+                try:
+                    datos = await ai_generar(
+                        nombre=producto.nombre,
+                        descripcion=producto.descripcion_input or producto.nombre,
+                        api_key=anthropic_key,
+                        image_urls=image_urls or None,
+                    )
+                except Exception:
+                    datos = None
+
+        elif ai_provider == "openai":
+            openai_content_key = None
+            if config and config.openai_api_key_enc:
+                openai_content_key = decrypt_secret(config.openai_api_key_enc)
+            elif _settings.openai_api_key:
+                openai_content_key = _settings.openai_api_key
+            if openai_content_key:
+                try:
+                    from app.services.openai_content_service import generar_contenido_producto as oai_generar
+                    dados = await oai_generar(
+                        nombre=producto.nombre,
+                        descripcion=producto.descripcion_input or producto.nombre,
+                        api_key=openai_content_key,
+                        image_urls=image_urls or None,
+                    )
+                    datos = dados
+                except Exception:
+                    datos = None
+
+        # Gemini free tier como generador principal o fallback universal
+        if datos is None:
             from app.services.gemini_service import generar_contenido_producto as gemini_generar
-            from app.config import settings as _settings
             gemini_key = None
             if config and config.gemini_api_key_enc:
                 gemini_key = decrypt_secret(config.gemini_api_key_enc)
@@ -74,16 +113,6 @@ async def _pipeline(product_id: str, tenant_id: str):
                 api_key=gemini_key,
                 image_urls=image_urls or None,
             )
-        else:
-            anthropic_key = None
-            if config and config.anthropic_api_key_enc:
-                anthropic_key = decrypt_secret(config.anthropic_api_key_enc)
-            datos = await ai_generar(
-                nombre=producto.nombre,
-                descripcion=producto.descripcion_input or producto.nombre,
-                api_key=anthropic_key,
-                image_urls=image_urls or None,
-            )
         contenido.titulo_seo = datos.get("titulo_seo")
         contenido.descripcion_seo = datos.get("descripcion_seo")
         contenido.bullet_points = datos.get("bullet_points")
@@ -91,18 +120,20 @@ async def _pipeline(product_id: str, tenant_id: str):
         contenido.video_script = datos.get("video_script")
         await db.commit()
 
-        # ── Paso 2: Imágenes IA (Imagen 3 si proveedor=gemini, DALL-E si OpenAI) ──
+        # ── Paso 2: Imágenes IA ──────────────────────────────────────────────────
+        # Prioridad: key paga configurada → gratis (Pollinations/Flux) como fallback
         from app.config import settings
+        from app.services.pollinations_service import generar_imagenes_producto as pollinations_generar
+
         urls_imagenes = []
 
+        # Intentar con proveedor pago si hay key
         if ai_provider == "gemini":
-            # Imagen 3 usa la misma key de Gemini
             gemini_img_key = None
             if config and config.gemini_api_key_enc:
                 gemini_img_key = decrypt_secret(config.gemini_api_key_enc)
             elif settings.gemini_api_key:
                 gemini_img_key = settings.gemini_api_key
-
             if gemini_img_key:
                 try:
                     from app.services.imagen_service import generar_imagenes_producto as imagen_generar
@@ -117,13 +148,11 @@ async def _pipeline(product_id: str, tenant_id: str):
                 except Exception:
                     pass
         else:
-            # DALL-E 3 (requiere OpenAI key)
             openai_key = None
             if config and config.openai_api_key_enc:
                 openai_key = decrypt_secret(config.openai_api_key_enc)
             elif settings.openai_api_key:
                 openai_key = settings.openai_api_key
-
             if openai_key:
                 try:
                     urls_imagenes = await generar_imagenes_producto(
@@ -134,6 +163,19 @@ async def _pipeline(product_id: str, tenant_id: str):
                     )
                 except Exception:
                     pass
+
+        # Fallback gratuito: Pollinations.ai (Flux) — sin key, sin costo
+        if not urls_imagenes:
+            try:
+                urls_imagenes = await pollinations_generar(
+                    nombre=producto.nombre,
+                    descripcion=producto.descripcion_input or "",
+                    tenant_id=tenant_id,
+                    product_id=product_id,
+                    cantidad=3,
+                )
+            except Exception:
+                pass
 
         if urls_imagenes:
             contenido.imagenes_generadas = urls_imagenes

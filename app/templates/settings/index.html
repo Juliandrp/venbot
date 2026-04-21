@@ -106,19 +106,22 @@
         </div>
       </div>
 
-      <!-- Nota sobre imágenes IA -->
-      <div class="mt-4 p-3 bg-gray-800/60 rounded-lg border border-gray-700 text-xs text-gray-400 space-y-1">
-        <p>🖼️ <strong class="text-gray-300">Generación de imágenes del producto:</strong></p>
-        <p x-show="form.ai_provider === 'gemini'">
-          Usará <strong class="text-indigo-300">Google Imagen 3</strong> con tu key de Gemini — sin costo adicional.
-          <span x-show="cfg.tiene_gemini_key" class="text-green-400">✓ Key configurada, listo para generar.</span>
-          <span x-show="!cfg.tiene_gemini_key" class="text-yellow-400">⚠ Configura tu API key de Gemini arriba.</span>
-        </p>
-        <p x-show="form.ai_provider !== 'gemini'">
-          Usará <strong class="text-gray-300">DALL-E 3 (OpenAI)</strong> — requiere cuenta OpenAI con billing activado (~$0.04/imagen).
-          <span x-show="cfg.tiene_openai_key" class="text-green-400">✓ Key de OpenAI configurada.</span>
-          <span x-show="!cfg.tiene_openai_key" class="text-yellow-400">⚠ Sin key de OpenAI: no se generarán imágenes IA.</span>
-        </p>
+      <!-- Resumen de cómo funciona -->
+      <div class="mt-4 p-4 bg-gray-800/60 rounded-xl border border-gray-700 text-xs text-gray-400 space-y-2">
+        <p class="font-medium text-gray-300">¿Cómo funciona sin pagar nada?</p>
+        <div class="space-y-1">
+          <p>📝 <strong class="text-gray-300">Contenido (copy, SEO):</strong>
+            <span class="text-green-400">Gemini 2 Flash gratis</span> — siempre disponible como base.
+            Si configuras Claude o ChatGPT con tu key propia, se usarán esos en su lugar.
+          </p>
+          <p>🖼️ <strong class="text-gray-300">Imágenes:</strong>
+            <span class="text-green-400">Pollinations.ai (Flux) gratis</span> — sin key, sin límite.
+            Si configuras Gemini → Imagen 3. Si configuras OpenAI → DALL-E 3 (~$0.04/img).
+          </p>
+          <p>🎬 <strong class="text-gray-300">Video:</strong>
+            Requiere key paga (Kling o HeyGen). Sin key → se omite el video.
+          </p>
+        </div>
       </div>
     </div>
 
