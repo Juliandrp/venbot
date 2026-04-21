@@ -10,7 +10,7 @@ from app.database import get_db
 from app.core.deps import get_current_tenant
 from app.models.tenant import Tenant
 from app.models.product import Product
-from app.schemas.product import ProductCreate, ProductOut, ProductListOut
+from app.schemas.product import ProductCreate, ProductUpdate, ProductOut, ProductDetailOut, ProductListOut
 
 MEDIA_ROOT = "/app/media"
 MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10 MB
@@ -25,6 +25,11 @@ templates = Jinja2Templates(directory="app/templates")
 @router.get("/vista/lista")
 async def vista_productos(request: Request):
     return templates.TemplateResponse("products/index.html", {"request": request})
+
+
+@router.get("/vista/{product_id}")
+async def vista_detalle_producto(product_id: uuid.UUID, request: Request):
+    return templates.TemplateResponse("products/detalle.html", {"request": request, "product_id": str(product_id)})
 
 
 # ─── API JSON ─────────────────────────────────────────────────
@@ -120,9 +125,29 @@ async def subir_imagenes(
     return producto
 
 
-@router.get("/{product_id}", response_model=ProductOut)
+@router.get("/{product_id}", response_model=ProductDetailOut)
 async def obtener_producto(
     product_id: uuid.UUID,
+    tenant: Tenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.models.product import ProductContent
+    from sqlalchemy.orm import selectinload
+    result = await db.execute(
+        select(Product)
+        .options(selectinload(Product.contenido))
+        .where(Product.id == product_id, Product.tenant_id == tenant.id)
+    )
+    producto = result.scalar_one_or_none()
+    if not producto:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    return producto
+
+
+@router.patch("/{product_id}", response_model=ProductOut)
+async def editar_producto(
+    product_id: uuid.UUID,
+    data: ProductUpdate,
     tenant: Tenant = Depends(get_current_tenant),
     db: AsyncSession = Depends(get_db),
 ):
@@ -132,6 +157,10 @@ async def obtener_producto(
     producto = result.scalar_one_or_none()
     if not producto:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
+    for field, value in data.model_dump(exclude_none=True).items():
+        setattr(producto, field, value)
+    await db.commit()
+    await db.refresh(producto)
     return producto
 
 

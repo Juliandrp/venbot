@@ -188,8 +188,12 @@
               <span x-show="!p.shopify_url" class="text-gray-600 text-sm">No publicado</span>
             </td>
             <td class="px-6 py-4">
-              <button @click="eliminar(p.id)"
-                      class="text-red-400 hover:text-red-300 text-sm transition-colors">Eliminar</button>
+              <div class="flex items-center gap-3">
+                <a :href="'/productos/vista/' + p.id"
+                   class="text-indigo-400 hover:text-indigo-300 text-sm transition-colors">Ver detalle</a>
+                <button @click="eliminar(p.id)"
+                        class="text-red-400 hover:text-red-300 text-sm transition-colors">Eliminar</button>
+              </div>
             </td>
           </tr>
         </template>

@@ -1,0 +1,348 @@
+{% extends "base.html" %}
+{% block title %}Detalle del producto{% endblock %}
+{% block page_title %}📦 Detalle del producto{% endblock %}
+
+{% block topbar_actions %}
+<a href="/productos/vista/lista"
+   class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium rounded-lg transition-colors">
+  ← Volver a productos
+</a>
+{% endblock %}
+
+{% block content %}
+<div x-data="detalle('{{ product_id }}')" x-init="cargar()">
+
+  <!-- Skeleton mientras carga -->
+  <div x-show="cargando" class="space-y-6 animate-pulse">
+    <div class="h-8 bg-gray-800 rounded-xl w-1/3"></div>
+    <div class="grid grid-cols-3 gap-6">
+      <div class="col-span-1 h-64 bg-gray-800 rounded-2xl"></div>
+      <div class="col-span-2 space-y-4">
+        <div class="h-5 bg-gray-800 rounded w-3/4"></div>
+        <div class="h-4 bg-gray-800 rounded w-1/2"></div>
+        <div class="h-4 bg-gray-800 rounded w-2/3"></div>
+      </div>
+    </div>
+  </div>
+
+  <div x-show="!cargando && p" class="space-y-6">
+
+    <!-- Cabecera -->
+    <div class="flex items-start justify-between gap-4">
+      <div>
+        <h1 class="text-2xl font-bold text-white" x-text="p?.nombre"></h1>
+        <div class="flex items-center gap-3 mt-2">
+          <span x-show="p?.contenido_generado"
+                class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs border bg-green-900/50 text-green-400 border-green-800">
+            ✓ Contenido listo
+          </span>
+          <span x-show="!p?.contenido_generado"
+                class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs border bg-yellow-900/30 text-yellow-400 border-yellow-800/50">
+            <span class="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse"></span>
+            Generando con IA...
+          </span>
+          <span x-show="p?.publicado_shopify"
+                class="px-2 py-1 rounded-full text-xs border bg-blue-900/50 text-blue-400 border-blue-800">
+            📤 En Shopify
+          </span>
+        </div>
+      </div>
+      <div class="flex gap-2 flex-shrink-0">
+        <button @click="regenerar()" :disabled="accion"
+                class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm rounded-lg transition-colors disabled:opacity-50">
+          🔄 Regenerar contenido
+        </button>
+        <button @click="publicarShopify()" :disabled="accion || !p?.precio"
+                x-show="!p?.publicado_shopify"
+                class="px-4 py-2 bg-green-700 hover:bg-green-600 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50">
+          📤 Publicar en Shopify
+        </button>
+        <a x-show="p?.shopify_url" :href="p?.shopify_url" target="_blank"
+           class="px-4 py-2 bg-blue-700 hover:bg-blue-600 text-white text-sm font-medium rounded-lg transition-colors">
+          Ver en tienda ↗
+        </a>
+      </div>
+    </div>
+
+    <div x-show="msgAccion" class="px-4 py-3 bg-indigo-900/40 text-indigo-300 border border-indigo-700 rounded-xl text-sm" x-text="msgAccion"></div>
+    <div x-show="error" class="px-4 py-3 bg-red-900/40 text-red-300 border border-red-700 rounded-xl text-sm" x-text="error"></div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+      <!-- Columna izquierda: imágenes + datos básicos -->
+      <div class="space-y-4">
+
+        <!-- Imágenes originales -->
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+          <h3 class="text-sm font-semibold text-gray-300 mb-3">Fotos del producto</h3>
+          <div x-show="(p?.imagenes_originales || []).length > 0" class="grid grid-cols-2 gap-2">
+            <template x-for="img in (p?.imagenes_originales || [])" :key="img">
+              <a :href="img" target="_blank">
+                <img :src="img" class="w-full h-24 object-cover rounded-lg border border-gray-700 hover:border-indigo-500 transition-colors" />
+              </a>
+            </template>
+            <!-- Agregar más fotos -->
+            <div @click="$refs.inputMasFotos.click()"
+                 class="h-24 border-2 border-dashed border-gray-700 hover:border-indigo-500 rounded-lg flex items-center justify-center cursor-pointer transition-colors text-gray-600 hover:text-indigo-400 text-xl">
+              +
+            </div>
+            <input type="file" x-ref="inputMasFotos" multiple accept="image/*" class="hidden"
+                   @change="agregarFotos($event.target.files)" />
+          </div>
+          <div x-show="(p?.imagenes_originales || []).length === 0"
+               @click="$refs.inputMasFotos.click()"
+               class="h-32 border-2 border-dashed border-gray-700 hover:border-indigo-500 rounded-xl flex flex-col items-center justify-center cursor-pointer transition-colors text-gray-500 hover:text-indigo-400">
+            <span class="text-3xl mb-1">📷</span>
+            <span class="text-xs">Agregar fotos</span>
+            <input type="file" x-ref="inputMasFotos" multiple accept="image/*" class="hidden"
+                   @change="agregarFotos($event.target.files)" />
+          </div>
+        </div>
+
+        <!-- Datos editables -->
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-3">
+          <h3 class="text-sm font-semibold text-gray-300 mb-1">Datos del producto</h3>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">Nombre</label>
+            <input type="text" x-model="edit.nombre"
+                   class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:border-indigo-500" />
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">Precio (USD)</label>
+              <input type="number" step="0.01" x-model="edit.precio"
+                     class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:border-indigo-500" />
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">Inventario</label>
+              <input type="number" x-model="edit.inventario"
+                     class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:border-indigo-500" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">Descripción para la IA</label>
+            <textarea x-model="edit.descripcion_input" rows="3" resize="none"
+                      class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:border-indigo-500 resize-none"></textarea>
+          </div>
+          <button @click="guardarEdicion()" :disabled="accion"
+                  class="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50">
+            Guardar cambios
+          </button>
+        </div>
+      </div>
+
+      <!-- Columna derecha: contenido generado por IA -->
+      <div class="lg:col-span-2 space-y-4">
+
+        <!-- Sin contenido aún -->
+        <div x-show="!p?.contenido_generado && !p?.contenido"
+             class="bg-gray-900 border border-gray-800 rounded-2xl p-8 text-center">
+          <div class="text-4xl mb-3">⏳</div>
+          <p class="text-gray-300 font-medium">La IA está generando el contenido</p>
+          <p class="text-gray-500 text-sm mt-1">Este proceso toma entre 1 y 3 minutos. La página se actualiza sola.</p>
+        </div>
+
+        <!-- Título SEO -->
+        <div x-show="p?.contenido?.titulo_seo" class="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+          <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Título SEO</h3>
+          <p class="text-white font-semibold text-lg" x-text="p?.contenido?.titulo_seo"></p>
+        </div>
+
+        <!-- Descripción SEO -->
+        <div x-show="p?.contenido?.descripcion_seo" class="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+          <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Descripción SEO</h3>
+          <p class="text-gray-200 text-sm leading-relaxed" x-text="p?.contenido?.descripcion_seo"></p>
+        </div>
+
+        <!-- Bullet points -->
+        <div x-show="(p?.contenido?.bullet_points || []).length > 0" class="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+          <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Puntos clave del producto</h3>
+          <ul class="space-y-2">
+            <template x-for="b in (p?.contenido?.bullet_points || [])" :key="b">
+              <li class="flex items-start gap-2 text-sm text-gray-200">
+                <span class="text-indigo-400 mt-0.5">✓</span>
+                <span x-text="b"></span>
+              </li>
+            </template>
+          </ul>
+        </div>
+
+        <!-- Copies por segmento -->
+        <div x-show="p?.contenido?.variantes_copy" class="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+          <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Copies de anuncios por segmento</h3>
+          <div class="space-y-3">
+            <template x-for="[edad, generos] in Object.entries(p?.contenido?.variantes_copy || {})" :key="edad">
+              <div class="border border-gray-800 rounded-xl p-4">
+                <p class="text-xs font-medium text-indigo-400 mb-2" x-text="edad + ' años'"></p>
+                <div class="space-y-2">
+                  <template x-for="[genero, copy] in Object.entries(generos)" :key="genero">
+                    <div class="flex gap-2">
+                      <span class="text-xs text-gray-500 w-8 flex-shrink-0 pt-0.5"
+                            x-text="genero === 'M' ? '♂' : genero === 'F' ? '♀' : '👥'"></span>
+                      <p class="text-xs text-gray-300 leading-relaxed" x-text="copy"></p>
+                      <button @click="copiar(copy)"
+                              class="text-xs text-gray-600 hover:text-indigo-400 flex-shrink-0">📋</button>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- Guión de video -->
+        <div x-show="p?.contenido?.video_script" class="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Guión de video</h3>
+            <div class="flex items-center gap-2">
+              <span x-show="p?.contenido?.video_estado === 'procesando'"
+                    class="inline-flex items-center gap-1.5 text-xs text-yellow-400">
+                <span class="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse"></span>
+                Video generándose...
+              </span>
+              <span x-show="p?.contenido?.video_estado === 'completed'"
+                    class="text-xs text-green-400">✓ Video listo</span>
+              <span x-show="p?.contenido?.video_estado === 'failed'"
+                    class="text-xs text-red-400">✗ Error al generar</span>
+            </div>
+          </div>
+          <p class="text-gray-300 text-sm leading-relaxed whitespace-pre-wrap" x-text="p?.contenido?.video_script"></p>
+        </div>
+
+        <!-- Video generado -->
+        <div x-show="p?.contenido?.video_url" class="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+          <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Video generado</h3>
+          <video :src="p?.contenido?.video_url" controls class="w-full rounded-xl max-h-96 bg-black"></video>
+          <a :href="p?.contenido?.video_url" target="_blank"
+             class="mt-2 inline-block text-xs text-indigo-400 hover:text-indigo-300">
+            Descargar video ↗
+          </a>
+        </div>
+
+        <!-- Imágenes generadas por IA -->
+        <div x-show="(p?.contenido?.imagenes_generadas || []).length > 0" class="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+          <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Imágenes generadas por IA (DALL-E)</h3>
+          <div class="grid grid-cols-3 gap-3">
+            <template x-for="img in (p?.contenido?.imagenes_generadas || [])" :key="img">
+              <a :href="img" target="_blank">
+                <img :src="img" class="w-full aspect-square object-cover rounded-xl border border-gray-700 hover:border-indigo-500 transition-colors" />
+              </a>
+            </template>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const token = localStorage.getItem('access_token');
+  if (!token) window.location.href = '/auth/iniciar-sesion';
+
+  function detalle(productId) {
+    return {
+      p: null, edit: {}, cargando: true, accion: false,
+      error: '', msgAccion: '',
+      _timer: null,
+
+      async cargar() {
+        this.cargando = true;
+        try {
+          const resp = await fetch(`/productos/${productId}`, {
+            headers: { Authorization: 'Bearer ' + token },
+          });
+          if (resp.status === 401) { window.location.href = '/auth/iniciar-sesion'; return; }
+          if (!resp.ok) { this.error = 'No se pudo cargar el producto'; return; }
+          this.p = await resp.json();
+          this.edit = {
+            nombre: this.p.nombre,
+            precio: this.p.precio,
+            precio_comparacion: this.p.precio_comparacion,
+            inventario: this.p.inventario,
+            descripcion_input: this.p.descripcion_input,
+          };
+          // Auto-refresh si el contenido aún está generándose
+          if (!this.p.contenido_generado || this.p.contenido?.video_estado === 'procesando') {
+            this._timer = setTimeout(() => this.cargar(), 15000);
+          }
+        } finally { this.cargando = false; }
+      },
+
+      async guardarEdicion() {
+        this.accion = true; this.error = ''; this.msgAccion = '';
+        try {
+          const resp = await fetch(`/productos/${productId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+            body: JSON.stringify(this.edit),
+          });
+          if (!resp.ok) { this.error = 'Error al guardar'; return; }
+          const data = await resp.json();
+          this.p = { ...this.p, ...data };
+          this.msgAccion = '✓ Cambios guardados';
+          setTimeout(() => this.msgAccion = '', 3000);
+        } finally { this.accion = false; }
+      },
+
+      async regenerar() {
+        this.accion = true; this.msgAccion = 'Relanzando pipeline de contenido...';
+        try {
+          await fetch(`/productos/${productId}/regenerar-contenido`, {
+            method: 'POST',
+            headers: { Authorization: 'Bearer ' + token },
+          });
+          this.p.contenido_generado = false;
+          this.msgAccion = '⏳ Pipeline relanzado. La página se actualizará automáticamente.';
+          setTimeout(() => this.cargar(), 5000);
+        } finally { this.accion = false; }
+      },
+
+      async publicarShopify() {
+        this.accion = true; this.msgAccion = 'Publicando en Shopify...'; this.error = '';
+        try {
+          const resp = await fetch(`/productos/${productId}/publicar-shopify`, {
+            method: 'POST',
+            headers: { Authorization: 'Bearer ' + token },
+          });
+          if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            this.error = err.detail || 'Error al publicar en Shopify';
+            this.msgAccion = '';
+            return;
+          }
+          const data = await resp.json();
+          this.p = { ...this.p, ...data };
+          this.msgAccion = '✓ Publicado en Shopify correctamente';
+        } finally { this.accion = false; }
+      },
+
+      async agregarFotos(files) {
+        if (!files.length) return;
+        this.accion = true; this.msgAccion = 'Subiendo fotos...';
+        try {
+          const fd = new FormData();
+          Array.from(files).forEach(f => fd.append('imagenes', f));
+          const resp = await fetch(`/productos/${productId}/imagenes`, {
+            method: 'POST',
+            headers: { Authorization: 'Bearer ' + token },
+            body: fd,
+          });
+          if (!resp.ok) { this.error = 'Error al subir fotos'; return; }
+          this.msgAccion = '✓ Fotos subidas. Regenerando contenido con IA...';
+          await this.cargar();
+        } finally { this.accion = false; }
+      },
+
+      copiar(texto) {
+        navigator.clipboard.writeText(texto).then(() => {
+          this.msgAccion = '📋 Copy copiado al portapapeles';
+          setTimeout(() => this.msgAccion = '', 2000);
+        });
+      },
+    };
+  }
+</script>
+{% endblock %}
