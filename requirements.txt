@@ -24,7 +24,7 @@ kombu==5.4.2
 flower==2.0.1
 
 # HTTP client
-httpx==0.28.0
+httpx==0.28.1
 tenacity==9.0.0
 
 # Config
@@ -36,6 +36,7 @@ pydantic-settings==2.6.1
 # AI / APIs
 anthropic==0.40.0
 openai==1.57.0
+google-genai==1.10.0
 
 # Email
 aiosmtplib==3.0.2

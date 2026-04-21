@@ -55,16 +55,31 @@ async def _pipeline(product_id: str, tenant_id: str):
             contenido = ProductContent(product_id=producto.id)
             db.add(contenido)
 
-        # ── Paso 1: Claude — copy y guión ───────────────────────────────
-        anthropic_key = None
-        if config and config.anthropic_api_key_enc:
-            anthropic_key = decrypt_secret(config.anthropic_api_key_enc)
+        # ── Paso 1: IA — copy y guión (Claude o Gemini según config del tenant) ──
+        ai_provider = (config.ai_provider if config else None) or "claude"
 
-        datos = await ai_generar(
-            nombre=producto.nombre,
-            descripcion=producto.descripcion_input or producto.nombre,
-            api_key=anthropic_key,
-        )
+        if ai_provider == "gemini":
+            from app.services.gemini_service import generar_contenido_producto as gemini_generar
+            from app.config import settings as _settings
+            gemini_key = None
+            if config and config.gemini_api_key_enc:
+                gemini_key = decrypt_secret(config.gemini_api_key_enc)
+            elif _settings.gemini_api_key:
+                gemini_key = _settings.gemini_api_key
+            datos = await gemini_generar(
+                nombre=producto.nombre,
+                descripcion=producto.descripcion_input or producto.nombre,
+                api_key=gemini_key,
+            )
+        else:
+            anthropic_key = None
+            if config and config.anthropic_api_key_enc:
+                anthropic_key = decrypt_secret(config.anthropic_api_key_enc)
+            datos = await ai_generar(
+                nombre=producto.nombre,
+                descripcion=producto.descripcion_input or producto.nombre,
+                api_key=anthropic_key,
+            )
         contenido.titulo_seo = datos.get("titulo_seo")
         contenido.descripcion_seo = datos.get("descripcion_seo")
         contenido.bullet_points = datos.get("bullet_points")

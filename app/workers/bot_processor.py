@@ -126,17 +126,30 @@ async def _responder_bot(tenant_id: str, external_user_id: str, texto: str, cana
             for m in hist_result.scalars().all()
         ]
 
-        # Obtener API key
-        anthropic_key = None
-        if config.anthropic_api_key_enc:
-            anthropic_key = decrypt_secret(config.anthropic_api_key_enc)
-
-        # Generar respuesta
-        respuesta, confianza = await generar_respuesta_bot(
-            historial=historial,
-            contexto_producto="Tienda de e-commerce",  # Se enriquece si hay producto en la conversación
-            api_key=anthropic_key,
-        )
+        # Generar respuesta (Claude o Gemini según config del tenant)
+        ai_provider = getattr(config, "ai_provider", None) or "claude"
+        if ai_provider == "gemini":
+            from app.services.gemini_service import generar_respuesta_bot as gemini_bot
+            from app.config import settings as _settings
+            gemini_key = None
+            if config.gemini_api_key_enc:
+                gemini_key = decrypt_secret(config.gemini_api_key_enc)
+            elif _settings.gemini_api_key:
+                gemini_key = _settings.gemini_api_key
+            respuesta, confianza = await gemini_bot(
+                historial=historial,
+                contexto_producto="Tienda de e-commerce",
+                api_key=gemini_key,
+            )
+        else:
+            anthropic_key = None
+            if config.anthropic_api_key_enc:
+                anthropic_key = decrypt_secret(config.anthropic_api_key_enc)
+            respuesta, confianza = await generar_respuesta_bot(
+                historial=historial,
+                contexto_producto="Tienda de e-commerce",
+                api_key=anthropic_key,
+            )
 
         # Guardar respuesta del bot
         msg_bot = Message(

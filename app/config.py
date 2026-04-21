@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     # IA (opcionales — se puede configurar por tenant en BD)
     anthropic_api_key: str = Field(default="", env="ANTHROPIC_API_KEY")
     openai_api_key: str = Field(default="", env="OPENAI_API_KEY")
+    gemini_api_key: str = Field(default="", env="GEMINI_API_KEY")
 
     # Super-admin (se crea automáticamente al iniciar)
     superadmin_email: str = Field(default="admin@venbot.io", env="SUPERADMIN_EMAIL")
