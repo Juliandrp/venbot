@@ -19,16 +19,17 @@ async def lifespan(app: FastAPI):
 
 
 async def _seed_superadmin():
-    """Crea el super-admin al iniciar si no existe."""
+    """Crea el super-admin al iniciar si no existe; actualiza contraseña si cambió en .env."""
     from app.database import AsyncSessionLocal
     from app.models.tenant import Tenant
-    from app.core.security import hash_password
+    from app.core.security import hash_password, verify_password
     from app.config import settings
     from sqlalchemy import select
 
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(Tenant).where(Tenant.email == settings.superadmin_email))
-        if not result.scalar_one_or_none():
+        admin = result.scalar_one_or_none()
+        if not admin:
             admin = Tenant(
                 nombre_empresa="Super Admin",
                 email=settings.superadmin_email,
@@ -37,6 +38,10 @@ async def _seed_superadmin():
                 activo=True,
             )
             db.add(admin)
+            await db.commit()
+        elif not verify_password(settings.superadmin_password, admin.hashed_password):
+            # La contraseña del .env cambió — sincronizar
+            admin.hashed_password = hash_password(settings.superadmin_password)
             await db.commit()
 
 
