@@ -10,18 +10,30 @@
 {% endblock %}
 
 {% block content %}
-<div x-data="productos()" x-init="cargar()" @abrir-modal-producto.window="modalNuevo = true">
+<div x-data="productos()" x-init="cargar()" @abrir-modal-producto.window="abrirModal()">
 
   <!-- Modal nuevo producto -->
   <div x-show="modalNuevo" x-cloak
-       class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-8 w-full max-w-lg">
-      <h2 class="text-xl font-bold text-white mb-6">Nuevo producto</h2>
-      <form @submit.prevent="crearProducto">
+       class="fixed inset-0 bg-black/70 flex items-start justify-center z-50 p-4 overflow-y-auto">
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-8 w-full max-w-2xl my-8">
+
+      <!-- Indicador de pasos -->
+      <div class="flex items-center gap-2 mb-8">
+        <div :class="paso===1 ? 'bg-indigo-600 text-white' : 'bg-gray-700 text-gray-400'"
+             class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 transition-colors">1</div>
+        <div class="flex-1 h-px bg-gray-700"></div>
+        <div :class="paso===2 ? 'bg-indigo-600 text-white' : 'bg-gray-700 text-gray-400'"
+             class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 transition-colors">2</div>
+        <span class="text-xs text-gray-500 ml-1" x-text="paso===1 ? 'Datos del producto' : 'Fotos del producto'"></span>
+      </div>
+
+      <!-- ── PASO 1: Datos ── -->
+      <div x-show="paso === 1">
+        <h2 class="text-xl font-bold text-white mb-6">Datos del producto</h2>
         <div class="space-y-4">
           <div>
             <label class="block text-sm font-medium text-gray-300 mb-2">Nombre del producto *</label>
-            <input type="text" x-model="form.nombre" required
+            <input type="text" x-model="form.nombre" @keydown.enter.prevent="siguientePaso()"
                    class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
                    placeholder="Ej: Licuadora Portátil Pro 1000W" />
           </div>
@@ -29,7 +41,7 @@
             <label class="block text-sm font-medium text-gray-300 mb-2">Descripción para la IA</label>
             <textarea x-model="form.descripcion_input" rows="3"
                       class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 resize-none"
-                      placeholder="Describe el producto, sus beneficios clave, público objetivo..."></textarea>
+                      placeholder="Beneficios clave, público objetivo, diferenciadores vs competencia..."></textarea>
           </div>
           <div class="grid grid-cols-2 gap-4">
             <div>
@@ -50,22 +62,87 @@
         <div x-show="error" class="mt-4 px-4 py-3 bg-red-900/50 text-red-300 border border-red-800 rounded-lg text-sm" x-text="error"></div>
 
         <div class="flex gap-3 mt-6">
-          <button type="button" @click="modalNuevo = false"
+          <button type="button" @click="cerrarModal()"
                   class="flex-1 px-4 py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl transition-colors">
             Cancelar
           </button>
-          <button type="submit" :disabled="cargando"
+          <button type="button" @click="siguientePaso()" :disabled="!form.nombre.trim()"
                   class="flex-1 px-4 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl transition-colors disabled:opacity-50">
-            <span x-text="cargando ? 'Creando...' : 'Crear y generar contenido'"></span>
+            Siguiente — Agregar fotos →
           </button>
         </div>
-      </form>
+      </div>
+
+      <!-- ── PASO 2: Imágenes ── -->
+      <div x-show="paso === 2">
+        <h2 class="text-xl font-bold text-white mb-1">Fotos del producto</h2>
+        <p class="text-sm text-gray-400 mb-5">
+          La IA analiza tus fotos reales para generar títulos SEO, descripciones, copies de anuncios y guión de video.
+          <span class="text-indigo-400">Cuantas mejores fotos, mejor el contenido.</span>
+        </p>
+
+        <!-- Zona drag-and-drop -->
+        <div @dragover.prevent @drop.prevent="agregarArchivos($event.dataTransfer.files)"
+             @click="$refs.inputArchivos.click()"
+             class="border-2 border-dashed border-gray-700 hover:border-indigo-500 rounded-xl p-8 text-center cursor-pointer transition-colors mb-4 select-none">
+          <div class="text-5xl mb-3">📷</div>
+          <p class="text-gray-200 font-medium">Arrastra las fotos aquí o haz clic para seleccionar</p>
+          <p class="text-gray-500 text-sm mt-1">JPG · PNG · WEBP · hasta 10 fotos · máx 10 MB c/u</p>
+          <input type="file" x-ref="inputArchivos" multiple accept="image/jpeg,image/png,image/webp" class="hidden"
+                 @change="agregarArchivos($event.target.files)" />
+        </div>
+
+        <!-- Previsualización -->
+        <div x-show="previews.length > 0" class="grid grid-cols-5 gap-2 mb-5">
+          <template x-for="(p, i) in previews" :key="i">
+            <div class="relative group aspect-square">
+              <img :src="p" class="w-full h-full object-cover rounded-lg border border-gray-700" />
+              <button @click.stop="quitarImagen(i)"
+                      class="absolute top-1 right-1 bg-black/70 hover:bg-red-600 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center transition-colors">✕</button>
+              <span x-show="i === 0" class="absolute bottom-1 left-1 bg-indigo-600 text-white text-xs px-1 rounded">Principal</span>
+            </div>
+          </template>
+          <!-- Agregar más -->
+          <div x-show="previews.length < 10"
+               @click="$refs.inputArchivos.click()"
+               class="aspect-square border-2 border-dashed border-gray-700 hover:border-indigo-500 rounded-lg flex items-center justify-center cursor-pointer transition-colors text-gray-600 hover:text-indigo-400 text-2xl">
+            +
+          </div>
+        </div>
+
+        <!-- Progreso -->
+        <div x-show="subiendo" class="mb-5">
+          <div class="flex justify-between text-sm text-gray-400 mb-1">
+            <span x-text="mensajeProgreso"></span>
+            <span x-text="progreso + '%'"></span>
+          </div>
+          <div class="h-2 bg-gray-800 rounded-full overflow-hidden">
+            <div class="h-full bg-indigo-600 rounded-full transition-all duration-700"
+                 :style="'width:' + progreso + '%'"></div>
+          </div>
+        </div>
+
+        <div x-show="error" class="mb-4 px-4 py-3 bg-red-900/50 text-red-300 border border-red-800 rounded-lg text-sm" x-text="error"></div>
+
+        <div class="flex gap-3">
+          <button type="button" @click="paso = 1" :disabled="subiendo"
+                  class="px-4 py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl transition-colors disabled:opacity-50">
+            ← Volver
+          </button>
+          <button type="button" @click="crearProducto()" :disabled="subiendo"
+                  class="flex-1 px-4 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl transition-colors disabled:opacity-50">
+            <span x-show="!subiendo" x-text="archivos.length > 0 ? '🚀 Crear con mis ' + archivos.length + ' foto(s)' : '🚀 Crear solo con descripción'"></span>
+            <span x-show="subiendo">Procesando...</span>
+          </button>
+        </div>
+      </div>
+
     </div>
   </div>
 
   <!-- Lista de productos -->
   <div class="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-    <div class="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
+    <div class="px-6 py-4 border-b border-gray-800">
       <span class="text-sm text-gray-400" x-text="total + ' productos'"></span>
     </div>
 
@@ -100,9 +177,8 @@
                     x-text="p.contenido_generado ? '✓ Listo' : '⏳ Generando'"></span>
             </td>
             <td class="px-6 py-4">
-              <span x-show="p.shopify_url">
-                <a :href="p.shopify_url" target="_blank" class="text-indigo-400 hover:text-indigo-300 text-sm">Ver en tienda ↗</a>
-              </span>
+              <a x-show="p.shopify_url" :href="p.shopify_url" target="_blank"
+                 class="text-indigo-400 hover:text-indigo-300 text-sm">Ver en tienda ↗</a>
               <span x-show="!p.shopify_url" class="text-gray-600 text-sm">No publicado</span>
             </td>
             <td class="px-6 py-4">
@@ -125,9 +201,114 @@
   function productos() {
     return {
       items: [], total: 0,
-      modalNuevo: false, cargando: false, cargandoLista: true,
-      error: '',
+      modalNuevo: false, paso: 1,
+      subiendo: false, cargandoLista: true,
+      error: '', progreso: 0, mensajeProgreso: '',
+      archivos: [], previews: [],
       form: { nombre: '', descripcion_input: '', precio: '', inventario: 0 },
+
+      abrirModal() {
+        this.modalNuevo = true;
+        this.paso = 1;
+        this.error = '';
+        this.archivos = [];
+        this.previews = [];
+        this.progreso = 0;
+        this.form = { nombre: '', descripcion_input: '', precio: '', inventario: 0 };
+      },
+
+      cerrarModal() {
+        if (this.subiendo) return;
+        this.modalNuevo = false;
+      },
+
+      siguientePaso() {
+        if (!this.form.nombre.trim()) { this.error = 'El nombre es obligatorio'; return; }
+        this.error = '';
+        this.paso = 2;
+      },
+
+      agregarArchivos(files) {
+        const nuevos = Array.from(files).filter(f => f.type.startsWith('image/'));
+        if (this.archivos.length + nuevos.length > 10) {
+          this.error = 'Máximo 10 imágenes por producto';
+          return;
+        }
+        this.error = '';
+        nuevos.forEach(f => {
+          this.archivos.push(f);
+          const reader = new FileReader();
+          reader.onload = e => this.previews.push(e.target.result);
+          reader.readAsDataURL(f);
+        });
+      },
+
+      quitarImagen(i) {
+        this.archivos.splice(i, 1);
+        this.previews.splice(i, 1);
+      },
+
+      async crearProducto() {
+        this.subiendo = true; this.error = ''; this.progreso = 5;
+        this.mensajeProgreso = 'Creando producto...';
+        try {
+          // Paso A: crear el registro del producto
+          const body = {
+            nombre: this.form.nombre,
+            descripcion_input: this.form.descripcion_input || null,
+            precio: this.form.precio ? parseFloat(this.form.precio) : null,
+            inventario: parseInt(this.form.inventario) || 0,
+          };
+          const respCrear = await fetch('/productos/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+            body: JSON.stringify(body),
+          });
+          if (!respCrear.ok) {
+            const err = await respCrear.json().catch(() => ({}));
+            this.error = err.detail || `Error ${respCrear.status}`;
+            return;
+          }
+          const producto = await respCrear.json();
+          this.progreso = 30;
+
+          if (this.archivos.length > 0) {
+            // Paso B: subir imágenes (el endpoint también lanza el pipeline con visión IA)
+            this.mensajeProgreso = `Subiendo ${this.archivos.length} foto(s) y generando contenido con IA...`;
+            const fd = new FormData();
+            this.archivos.forEach(f => fd.append('imagenes', f));
+            const respImg = await fetch(`/productos/${producto.id}/imagenes`, {
+              method: 'POST',
+              headers: { Authorization: 'Bearer ' + token },
+              body: fd,
+            });
+            if (!respImg.ok) {
+              const err = await respImg.json().catch(() => ({}));
+              this.error = err.detail || 'Error al subir imágenes';
+              this.progreso = 0;
+              await this.cargar();
+              return;
+            }
+          } else {
+            // Sin fotos: lanzar pipeline solo con texto
+            this.mensajeProgreso = 'Generando contenido con IA...';
+            await fetch(`/productos/${producto.id}/regenerar-contenido`, {
+              method: 'POST',
+              headers: { Authorization: 'Bearer ' + token },
+            });
+          }
+
+          this.progreso = 100;
+          this.mensajeProgreso = '¡Listo! Contenido en proceso de generación.';
+          await new Promise(r => setTimeout(r, 600));
+          this.cerrarModal();
+          await this.cargar();
+        } catch (e) {
+          this.error = 'Error de conexión: ' + e.message;
+        } finally {
+          this.subiendo = false;
+        }
+      },
 
       async cargar() {
         this.cargandoLista = true;
@@ -138,33 +319,6 @@
           this.items = data.items;
           this.total = data.total;
         } finally { this.cargandoLista = false; }
-      },
-
-      async crearProducto() {
-        this.cargando = true; this.error = '';
-        try {
-          const body = {
-            nombre: this.form.nombre,
-            descripcion_input: this.form.descripcion_input || null,
-            precio: this.form.precio ? parseFloat(this.form.precio) : null,
-            inventario: parseInt(this.form.inventario) || 0,
-          };
-          const resp = await fetch('/productos/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-            body: JSON.stringify(body),
-          });
-          if (!resp.ok) {
-            const err = await resp.json().catch(() => ({}));
-            this.error = err.detail || `Error ${resp.status} al crear el producto`;
-            return;
-          }
-          this.modalNuevo = false;
-          this.form = { nombre: '', descripcion_input: '', precio: '', inventario: 0 };
-          await this.cargar();
-        } catch (e) {
-          this.error = 'Error de conexión: ' + e.message;
-        } finally { this.cargando = false; }
       },
 
       async eliminar(id) {

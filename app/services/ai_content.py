@@ -1,7 +1,12 @@
 """Generación de contenido IA via Claude API."""
+import base64
+import mimetypes
+import os
 import anthropic
 from tenacity import retry, stop_after_attempt, wait_exponential
 from app.config import settings
+
+MEDIA_ROOT = "/app/media"
 
 
 GRUPOS_EDAD = ["18-24", "25-34", "35-44", "45+"]
@@ -16,17 +21,30 @@ def _get_client(api_key: str | None = None) -> anthropic.Anthropic:
     return anthropic.Anthropic(api_key=api_key or settings.anthropic_api_key)
 
 
+def _url_a_bloque_imagen(url_relativa: str) -> dict | None:
+    """Convierte una URL relativa /media/... a un bloque de imagen base64 para Claude."""
+    ruta = os.path.join(MEDIA_ROOT, url_relativa.lstrip("/media/"))
+    if not os.path.exists(ruta):
+        return None
+    mime = mimetypes.guess_type(ruta)[0] or "image/jpeg"
+    with open(ruta, "rb") as f:
+        datos = base64.standard_b64encode(f.read()).decode()
+    return {"type": "image", "source": {"type": "base64", "media_type": mime, "data": datos}}
+
+
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
 async def generar_contenido_producto(
     nombre: str,
     descripcion: str,
     api_key: str | None = None,
+    image_urls: list[str] | None = None,
 ) -> dict:
     """Genera título SEO, descripción, bullet points y variantes de copy por segmento."""
     client = _get_client(api_key)
 
-    prompt = f"""Producto: {nombre}
+    prompt_text = f"""Producto: {nombre}
 Descripción del vendedor: {descripcion}
+{"" if not image_urls else "(Analiza las imágenes adjuntas del producto real para generar contenido preciso.)"}
 
 Genera el siguiente JSON (sin markdown, solo el JSON):
 {{
@@ -39,30 +57,26 @@ Genera el siguiente JSON (sin markdown, solo el JSON):
       "F": "copy anuncio para mujeres 18-24 años (máx 125 chars)",
       "todos": "copy anuncio para 18-24 años (máx 125 chars)"
     }},
-    "25-34": {{
-      "M": "...",
-      "F": "...",
-      "todos": "..."
-    }},
-    "35-44": {{
-      "M": "...",
-      "F": "...",
-      "todos": "..."
-    }},
-    "45+": {{
-      "M": "...",
-      "F": "...",
-      "todos": "..."
-    }}
+    "25-34": {{"M": "...", "F": "...", "todos": "..."}},
+    "35-44": {{"M": "...", "F": "...", "todos": "..."}},
+    "45+":   {{"M": "...", "F": "...", "todos": "..."}}
   }},
   "video_script": "guión de video corto 30-60 segundos para HeyGen"
 }}"""
+
+    content: list = []
+    if image_urls:
+        for url in image_urls[:4]:
+            bloque = _url_a_bloque_imagen(url)
+            if bloque:
+                content.append(bloque)
+    content.append({"type": "text", "text": prompt_text})
 
     message = client.messages.create(
         model="claude-sonnet-4-6",
         max_tokens=2048,
         system=SYSTEM_PROMPT_CONTENIDO,
-        messages=[{"role": "user", "content": prompt}],
+        messages=[{"role": "user", "content": content}],
     )
 
     import json

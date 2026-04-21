@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -50,6 +51,10 @@ app = FastAPI(
 
 # Archivos estáticos
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
+
+# Media (imágenes subidas por tenants)
+os.makedirs("/app/media", exist_ok=True)
+app.mount("/media", StaticFiles(directory="/app/media"), name="media")
 
 # Routers
 app.include_router(auth.router)

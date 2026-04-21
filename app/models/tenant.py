@@ -97,9 +97,11 @@ class TenantConfig(Base):
 
     # AI overrides (opcionales, usan las del platform si están vacíos)
     ai_provider: Mapped[str] = mapped_column(String(20), default="claude")  # claude | gemini
+    video_provider: Mapped[str] = mapped_column(String(20), default="kling")  # kling | heygen
     anthropic_api_key_enc: Mapped[str | None] = mapped_column(Text, nullable=True)
     gemini_api_key_enc: Mapped[str | None] = mapped_column(Text, nullable=True)
     heygen_api_key_enc: Mapped[str | None] = mapped_column(Text, nullable=True)
+    kling_api_key_enc: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

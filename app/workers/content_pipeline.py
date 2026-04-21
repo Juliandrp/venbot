@@ -58,6 +58,8 @@ async def _pipeline(product_id: str, tenant_id: str):
         # ── Paso 1: IA — copy y guión (Claude o Gemini según config del tenant) ──
         ai_provider = (config.ai_provider if config else None) or "claude"
 
+        image_urls = list(producto.imagenes_originales or [])
+
         if ai_provider == "gemini":
             from app.services.gemini_service import generar_contenido_producto as gemini_generar
             from app.config import settings as _settings
@@ -70,6 +72,7 @@ async def _pipeline(product_id: str, tenant_id: str):
                 nombre=producto.nombre,
                 descripcion=producto.descripcion_input or producto.nombre,
                 api_key=gemini_key,
+                image_urls=image_urls or None,
             )
         else:
             anthropic_key = None
@@ -79,6 +82,7 @@ async def _pipeline(product_id: str, tenant_id: str):
                 nombre=producto.nombre,
                 descripcion=producto.descripcion_input or producto.nombre,
                 api_key=anthropic_key,
+                image_urls=image_urls or None,
             )
         contenido.titulo_seo = datos.get("titulo_seo")
         contenido.descripcion_seo = datos.get("descripcion_seo")
@@ -105,20 +109,62 @@ async def _pipeline(product_id: str, tenant_id: str):
         except Exception:
             pass  # No bloquear si falla la generación de imágenes
 
-        # ── Paso 3: HeyGen — video ──────────────────────────────────────
-        heygen_key = None
-        if config and config.heygen_api_key_enc:
-            heygen_key = decrypt_secret(config.heygen_api_key_enc)
+        # ── Paso 3: Video con Kling (por defecto) o HeyGen ─────────────────
+        video_provider = (config.video_provider if config else None) or "kling"
 
-        if heygen_key and contenido.video_script:
-            try:
-                heygen = HeyGenService(heygen_key)
-                video_id = await heygen.crear_video(contenido.video_script)
-                contenido.heygen_video_id = video_id
-                contenido.video_estado = "procesando"
-                await db.commit()
-            except Exception:
-                pass
+        if contenido.video_script:
+            if video_provider == "kling":
+                kling_key = None
+                if config and config.kling_api_key_enc:
+                    kling_key = decrypt_secret(config.kling_api_key_enc)
+                elif settings.kling_api_key:
+                    kling_key = settings.kling_api_key
+
+                if kling_key:
+                    try:
+                        from app.services.kling_service import KlingService
+                        kling = KlingService(kling_key)
+                        imagen_ref = None
+                        if image_urls:
+                            app_url = settings.app_base_url.rstrip("/")
+                            imagen_ref = f"{app_url}{image_urls[0]}"
+
+                        if imagen_ref:
+                            task_id = await kling.crear_video_desde_imagen(
+                                image_url=imagen_ref,
+                                prompt=contenido.video_script,
+                                duracion=5,
+                                ratio="9:16",
+                            )
+                        else:
+                            task_id = await kling.crear_video_desde_texto(
+                                prompt=contenido.video_script,
+                                duracion=5,
+                                ratio="9:16",
+                            )
+                        contenido.heygen_video_id = task_id
+                        contenido.video_estado = "procesando"
+                        await db.commit()
+                        verificar_video_kling.apply_async(
+                            args=[str(producto.id), str(tenant_id)],
+                            countdown=60,
+                        )
+                    except Exception:
+                        pass
+
+            else:  # heygen
+                heygen_key = None
+                if config and config.heygen_api_key_enc:
+                    heygen_key = decrypt_secret(config.heygen_api_key_enc)
+                if heygen_key:
+                    try:
+                        heygen = HeyGenService(heygen_key)
+                        video_id = await heygen.crear_video(contenido.video_script)
+                        contenido.heygen_video_id = video_id
+                        contenido.video_estado = "procesando"
+                        await db.commit()
+                    except Exception:
+                        pass
 
         # ── Paso 4: Publicar en Shopify (si está configurado y hay precio) ──
         shopify_url_store = config.shopify_store_url if config else None
@@ -208,4 +254,62 @@ async def _verificar_video(product_id: str, tenant_id: str, task):
             await db.commit()
         else:
             # Todavía procesando — reintentar
+            raise task.retry()
+
+
+@celery_app.task(
+    name="app.workers.content_pipeline.verificar_video_kling",
+    bind=True,
+    max_retries=20,
+    default_retry_delay=60,  # Verificar cada minuto (Kling suele tardar 2-5 min)
+)
+def verificar_video_kling(self, product_id: str, tenant_id: str):
+    """Polling del estado del video en Kling hasta que esté listo."""
+    asyncio.run(_verificar_kling(product_id, tenant_id, self))
+
+
+async def _verificar_kling(product_id: str, tenant_id: str, task):
+    from app.database import AsyncSessionLocal
+    from app.models.product import ProductContent
+    from app.models.tenant import TenantConfig
+    from app.services.kling_service import KlingService
+    from app.core.security import decrypt_secret
+    from app.config import settings
+    from sqlalchemy import select
+
+    async with AsyncSessionLocal() as db:
+        pc_result = await db.execute(
+            select(ProductContent).where(ProductContent.product_id == uuid.UUID(product_id))
+        )
+        contenido = pc_result.scalar_one_or_none()
+        if not contenido or not contenido.heygen_video_id:
+            return
+        if contenido.video_estado == "completed":
+            return
+
+        config_result = await db.execute(
+            select(TenantConfig).where(TenantConfig.tenant_id == uuid.UUID(tenant_id))
+        )
+        config = config_result.scalar_one_or_none()
+
+        kling_key = None
+        if config and config.kling_api_key_enc:
+            kling_key = decrypt_secret(config.kling_api_key_enc)
+        elif settings.kling_api_key:
+            kling_key = settings.kling_api_key
+
+        if not kling_key:
+            return
+
+        kling = KlingService(kling_key)
+        estado = await kling.obtener_estado(contenido.heygen_video_id)
+
+        if estado["estado"] == "completed":
+            contenido.video_url = estado["video_url"]
+            contenido.video_estado = "completed"
+            await db.commit()
+        elif estado["estado"] == "failed":
+            contenido.video_estado = "failed"
+            await db.commit()
+        else:
             raise task.retry()

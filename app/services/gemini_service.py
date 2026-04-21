@@ -1,7 +1,11 @@
 """Generación de contenido IA via Gemini 2 Flash."""
 import json
+import mimetypes
+import os
 from tenacity import retry, stop_after_attempt, wait_exponential
 from app.config import settings
+
+MEDIA_ROOT = "/app/media"
 
 MODEL = "gemini-2.0-flash"
 
@@ -17,19 +21,35 @@ def _get_client(api_key: str | None = None):
     return genai.Client(api_key=api_key or settings.gemini_api_key)
 
 
+def _leer_partes_imagen(image_urls: list[str]) -> list:
+    """Lee imágenes del disco y las convierte en Parts de Gemini."""
+    from google.genai import types
+    partes = []
+    for url in image_urls[:4]:
+        ruta = os.path.join(MEDIA_ROOT, url.lstrip("/media/"))
+        if not os.path.exists(ruta):
+            continue
+        mime = mimetypes.guess_type(ruta)[0] or "image/jpeg"
+        with open(ruta, "rb") as f:
+            partes.append(types.Part.from_bytes(data=f.read(), mime_type=mime))
+    return partes
+
+
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
 async def generar_contenido_producto(
     nombre: str,
     descripcion: str,
     api_key: str | None = None,
+    image_urls: list[str] | None = None,
 ) -> dict:
     """Genera título SEO, descripción, bullet points y variantes de copy por segmento."""
     client = _get_client(api_key)
 
-    prompt = f"""{SYSTEM_PROMPT_CONTENIDO}
+    prompt_text = f"""{SYSTEM_PROMPT_CONTENIDO}
 
 Producto: {nombre}
 Descripción del vendedor: {descripcion}
+{"(Analiza las imágenes adjuntas del producto real para generar contenido preciso.)" if image_urls else ""}
 
 Genera el siguiente JSON (sin markdown, solo el JSON):
 {{
@@ -45,10 +65,12 @@ Genera el siguiente JSON (sin markdown, solo el JSON):
   "video_script": "guión de video corto 30-60 segundos para HeyGen"
 }}"""
 
-    response = await client.aio.models.generate_content(
-        model=MODEL,
-        contents=prompt,
-    )
+    contents = []
+    if image_urls:
+        contents.extend(_leer_partes_imagen(image_urls))
+    contents.append(prompt_text)
+
+    response = await client.aio.models.generate_content(model=MODEL, contents=contents)
     text = response.text.strip()
     if text.startswith("```"):
         text = text.split("```")[1]
