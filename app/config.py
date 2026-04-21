@@ -1,9 +1,15 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
 from functools import lru_cache
 
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=False,
+        extra="ignore",        # ignora vars del .env que no estén definidas aquí
+    )
+
     # App
     secret_key: str = Field(..., env="SECRET_KEY")
     algorithm: str = "HS256"
@@ -21,20 +27,16 @@ class Settings(BaseSettings):
     celery_broker_url: str = Field(..., env="CELERY_BROKER_URL")
     celery_result_backend: str = Field(..., env="CELERY_RESULT_BACKEND")
 
-    # Encryption
+    # Cifrado de secretos de tenants
     encryption_key: str = Field(..., env="ENCRYPTION_KEY")
 
-    # AI
+    # IA (opcionales — se puede configurar por tenant en BD)
     anthropic_api_key: str = Field(default="", env="ANTHROPIC_API_KEY")
     openai_api_key: str = Field(default="", env="OPENAI_API_KEY")
 
-    # Super-admin
+    # Super-admin (se crea automáticamente al iniciar)
     superadmin_email: str = Field(default="admin@venbot.io", env="SUPERADMIN_EMAIL")
     superadmin_password: str = Field(default="changeme", env="SUPERADMIN_PASSWORD")
-
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
 
 
 @lru_cache

@@ -93,6 +93,8 @@ services:
     command: celery -A app.celery_app flower --port=5555 --basic_auth=${FLOWER_USER:-admin}:${FLOWER_PASSWORD:-flower123}
     ports:
       - "5555:5555"
+    volumes:
+      - ./app:/app/app
     depends_on:
       - redis
 
