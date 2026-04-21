@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Resumen{% endblock %}
+{% block page_title %}📊 Resumen del Negocio{% endblock %}
+
+{% block topbar_actions %}
+<button onclick="cargarResumen()"
+        class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition-colors">
+  Actualizar
+</button>
+{% endblock %}
+
+{% block content %}
+<div x-data="dashboard()" x-init="cargar()">
+
+  <!-- KPIs -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+      <p class="text-sm text-gray-500 mb-1">Revenue hoy</p>
+      <p class="text-3xl font-bold text-white" x-text="'$' + resumen.revenue_hoy?.toLocaleString('es-CO') || '$0'"></p>
+      <p class="text-xs text-green-400 mt-2">↑ Hoy</p>
+    </div>
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+      <p class="text-sm text-gray-500 mb-1">Revenue últimos 7 días</p>
+      <p class="text-3xl font-bold text-white" x-text="'$' + resumen.revenue_semana?.toLocaleString('es-CO') || '$0'"></p>
+    </div>
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+      <p class="text-sm text-gray-500 mb-1">Revenue este mes</p>
+      <p class="text-3xl font-bold text-white" x-text="'$' + resumen.revenue_mes?.toLocaleString('es-CO') || '$0'"></p>
+    </div>
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+      <p class="text-sm text-gray-500 mb-1">Pedidos hoy</p>
+      <p class="text-3xl font-bold text-white" x-text="resumen.pedidos_hoy || 0"></p>
+    </div>
+  </div>
+
+  <!-- Segunda fila -->
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 flex items-center gap-4">
+      <div class="text-3xl">📣</div>
+      <div>
+        <p class="text-sm text-gray-500">Campañas activas</p>
+        <p class="text-2xl font-bold text-indigo-400" x-text="resumen.campanas_activas || 0"></p>
+      </div>
+    </div>
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 flex items-center gap-4">
+      <div class="text-3xl">🤖</div>
+      <div>
+        <p class="text-sm text-gray-500">Bot activo</p>
+        <p class="text-2xl font-bold text-green-400">Online</p>
+      </div>
+    </div>
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 flex items-center gap-4">
+      <div class="text-3xl">📦</div>
+      <div>
+        <p class="text-sm text-gray-500">Plan actual</p>
+        <p class="text-2xl font-bold text-yellow-400">Trial</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Accesos rápidos -->
+  <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+    <h2 class="text-lg font-semibold text-white mb-4">Acciones rápidas</h2>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <a href="/productos/vista/lista"
+         class="flex flex-col items-center gap-2 p-4 bg-gray-800 hover:bg-gray-700 rounded-xl transition-colors text-center">
+        <span class="text-2xl">➕</span>
+        <span class="text-sm text-gray-300">Nuevo producto</span>
+      </a>
+      <a href="/dashboard/campanas"
+         class="flex flex-col items-center gap-2 p-4 bg-gray-800 hover:bg-gray-700 rounded-xl transition-colors text-center">
+        <span class="text-2xl">🚀</span>
+        <span class="text-sm text-gray-300">Lanzar campaña</span>
+      </a>
+      <a href="/dashboard/bot"
+         class="flex flex-col items-center gap-2 p-4 bg-gray-800 hover:bg-gray-700 rounded-xl transition-colors text-center">
+        <span class="text-2xl">💬</span>
+        <span class="text-sm text-gray-300">Ver conversaciones</span>
+      </a>
+      <a href="/dashboard/configuracion"
+         class="flex flex-col items-center gap-2 p-4 bg-gray-800 hover:bg-gray-700 rounded-xl transition-colors text-center">
+        <span class="text-2xl">⚙️</span>
+        <span class="text-sm text-gray-300">Configurar APIs</span>
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const token = localStorage.getItem('access_token');
+  if (!token) window.location.href = '/auth/iniciar-sesion';
+
+  function dashboard() {
+    return {
+      resumen: {},
+      async cargar() {
+        try {
+          const resp = await fetch('/dashboard/resumen', {
+            headers: { 'Authorization': 'Bearer ' + token }
+          });
+          if (resp.status === 401) { window.location.href = '/auth/iniciar-sesion'; return; }
+          this.resumen = await resp.json();
+        } catch {}
+      }
+    };
+  }
+</script>
+{% endblock %}

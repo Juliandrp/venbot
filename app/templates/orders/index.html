@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Pedidos{% endblock %}
+{% block page_title %}🛒 Pedidos{% endblock %}
+
+{% block content %}
+<div x-data="pedidos()" x-init="cargar()">
+  <div class="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-800">
+      <span class="text-sm text-gray-400" x-text="items.length + ' pedidos'"></span>
+    </div>
+
+    <div x-show="cargando" class="py-12 text-center text-gray-500">Cargando pedidos...</div>
+    <div x-show="!cargando && items.length === 0" class="py-12 text-center text-gray-500">
+      Aún no hay pedidos registrados.
+    </div>
+
+    <table x-show="!cargando && items.length > 0" class="w-full">
+      <thead class="bg-gray-800/50">
+        <tr>
+          <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">ID</th>
+          <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Destinatario</th>
+          <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Ciudad</th>
+          <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Total</th>
+          <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Estado</th>
+          <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Seguimiento</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-800">
+        <template x-for="p in items" :key="p.id">
+          <tr class="hover:bg-gray-800/30">
+            <td class="px-6 py-4 font-mono text-xs text-gray-500" x-text="p.id.substring(0, 8)"></td>
+            <td class="px-6 py-4">
+              <p class="font-medium text-white text-sm" x-text="p.nombre_destinatario"></p>
+              <p class="text-xs text-gray-500" x-text="p.telefono_destinatario"></p>
+            </td>
+            <td class="px-6 py-4 text-gray-300 text-sm" x-text="p.ciudad_envio"></td>
+            <td class="px-6 py-4 text-white font-medium" x-text="'$' + parseFloat(p.total).toLocaleString('es-CO')"></td>
+            <td class="px-6 py-4">
+              <span :class="{
+                'bg-green-900/50 text-green-400 border-green-800': p.estado === 'entregado',
+                'bg-blue-900/50 text-blue-400 border-blue-800': p.estado === 'enviado' || p.estado === 'en_camino',
+                'bg-yellow-900/50 text-yellow-400 border-yellow-800': p.estado === 'confirmado',
+                'bg-gray-800 text-gray-400 border-gray-700': p.estado === 'pendiente',
+                'bg-red-900/50 text-red-400 border-red-800': p.estado === 'fallido' || p.estado === 'cancelado',
+              }" class="px-2 py-1 rounded-full text-xs border" x-text="p.estado"></span>
+            </td>
+            <td class="px-6 py-4 font-mono text-xs text-gray-500" x-text="p.numero_seguimiento || '—'"></td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const token = localStorage.getItem('access_token');
+  if (!token) window.location.href = '/auth/iniciar-sesion';
+
+  function pedidos() {
+    return {
+      items: [], cargando: true,
+      async cargar() {
+        try {
+          const resp = await fetch('/pedidos/', { headers: { Authorization: 'Bearer ' + token } });
+          if (resp.status === 401) { window.location.href = '/auth/iniciar-sesion'; return; }
+          this.items = await resp.json();
+        } finally { this.cargando = false; }
+      },
+    };
+  }
+</script>
+{% endblock %}

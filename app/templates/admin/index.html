@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Panel Admin{% endblock %}
+{% block page_title %}🛡️ Panel de Administración{% endblock %}
+
+{% block content %}
+<div x-data="adminPanel()" x-init="cargar()">
+
+  <!-- Métricas globales -->
+  <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+      <p class="text-sm text-gray-500">Total tenants</p>
+      <p class="text-3xl font-bold text-white mt-1" x-text="metricas.total_tenants || 0"></p>
+    </div>
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+      <p class="text-sm text-gray-500">Tenants activos</p>
+      <p class="text-3xl font-bold text-green-400 mt-1" x-text="metricas.tenants_activos || 0"></p>
+    </div>
+  </div>
+
+  <!-- Tabla tenants -->
+  <div class="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-800">
+      <h2 class="font-semibold text-white">Todos los tenants</h2>
+    </div>
+    <table class="w-full">
+      <thead class="bg-gray-800/50">
+        <tr>
+          <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Empresa</th>
+          <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Email</th>
+          <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Plan</th>
+          <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Estado</th>
+          <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Acciones</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-800">
+        <template x-for="t in tenants" :key="t.id">
+          <tr class="hover:bg-gray-800/30">
+            <td class="px-6 py-4 font-medium text-white" x-text="t.nombre_empresa"></td>
+            <td class="px-6 py-4 text-gray-400 text-sm" x-text="t.email"></td>
+            <td class="px-6 py-4 text-gray-400 text-sm" x-text="t.estado_suscripcion"></td>
+            <td class="px-6 py-4">
+              <span :class="t.activo ? 'text-green-400' : 'text-red-400'" x-text="t.activo ? 'Activo' : 'Inactivo'"></span>
+            </td>
+            <td class="px-6 py-4 flex gap-2">
+              <button @click="suspender(t.id)"
+                      class="px-3 py-1 bg-red-800 hover:bg-red-700 text-red-200 text-xs rounded-lg">
+                Suspender
+              </button>
+              <button @click="activar(t.id)"
+                      class="px-3 py-1 bg-green-800 hover:bg-green-700 text-green-200 text-xs rounded-lg">
+                Activar
+              </button>
+            </td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const token = localStorage.getItem('access_token');
+  if (!token) window.location.href = '/auth/iniciar-sesion';
+
+  function adminPanel() {
+    return {
+      tenants: [], metricas: {},
+      async cargar() {
+        const headers = { Authorization: 'Bearer ' + token };
+        const [tResp, mResp] = await Promise.all([
+          fetch('/admin/tenants', { headers }),
+          fetch('/admin/metricas', { headers }),
+        ]);
+        if (tResp.status === 403) { window.location.href = '/dashboard/'; return; }
+        this.tenants = await tResp.json();
+        this.metricas = await mResp.json();
+      },
+      async suspender(id) {
+        await fetch('/admin/tenants/' + id + '/suspender', { method: 'POST', headers: { Authorization: 'Bearer ' + token } });
+        await this.cargar();
+      },
+      async activar(id) {
+        await fetch('/admin/tenants/' + id + '/activar', { method: 'POST', headers: { Authorization: 'Bearer ' + token } });
+        await this.cargar();
+      },
+    };
+  }
+</script>
+{% endblock %}

@@ -1,0 +1,134 @@
+version: "3.9"
+
+x-app-env: &app-env
+  env_file: .env
+  environment:
+    - DATABASE_URL=${DATABASE_URL}
+    - REDIS_URL=${REDIS_URL}
+    - CELERY_BROKER_URL=${CELERY_BROKER_URL}
+    - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
+
+services:
+  # ─── PostgreSQL ────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: venbot
+      POSTGRES_PASSWORD: venbot_pass
+      POSTGRES_DB: venbot_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U venbot -d venbot_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - venbot_net
+
+  # ─── Redis ─────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - venbot_net
+
+  # ─── FastAPI App ────────────────────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
+    <<: *app-env
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./app:/app/app
+      - media_files:/app/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - venbot_net
+    labels:
+      # Traefik labels for reverse proxy
+      - "traefik.enable=true"
+      - "traefik.http.routers.venbot.rule=Host(`${APP_DOMAIN:-venbot.localhost}`)"
+      - "traefik.http.routers.venbot.entrypoints=websecure"
+      - "traefik.http.routers.venbot.tls.certresolver=letsencrypt"
+      - "traefik.http.services.venbot.loadbalancer.server.port=8000"
+
+  # ─── Celery Worker ──────────────────────────────────────────
+  celery-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: celery -A app.celery_app worker --loglevel=info --concurrency=4 -Q default,content,notifications
+    <<: *app-env
+    volumes:
+      - ./app:/app/app
+      - media_files:/app/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - venbot_net
+
+  # ─── Celery Beat (scheduler) ────────────────────────────────
+  celery-beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: celery -A app.celery_app beat --loglevel=info --scheduler celery.beat:PersistentScheduler
+    <<: *app-env
+    volumes:
+      - ./app:/app/app
+      - celerybeat_data:/app/celerybeat
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - venbot_net
+
+  # ─── Flower (Celery monitoring, optional) ───────────────────
+  flower:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: celery -A app.celery_app flower --port=5555 --basic_auth=${FLOWER_USER:-admin}:${FLOWER_PASSWORD:-flower123}
+    <<: *app-env
+    ports:
+      - "5555:5555"
+    depends_on:
+      - redis
+    networks:
+      - venbot_net
+
+volumes:
+  postgres_data:
+  redis_data:
+  media_files:
+  celerybeat_data:
+
+networks:
+  venbot_net:
+    driver: bridge

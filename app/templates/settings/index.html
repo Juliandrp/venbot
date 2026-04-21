@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+{% block title %}Configuración{% endblock %}
+{% block page_title %}⚙️ Configuración de APIs{% endblock %}
+
+{% block content %}
+<div x-data="config()" x-init="cargar()">
+  <div class="max-w-3xl space-y-6">
+
+    <!-- Shopify -->
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+      <h2 class="font-semibold text-white mb-4 flex items-center gap-2">
+        <span class="text-xl">🛍️</span> Shopify
+      </h2>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">URL de tu tienda (sin https://)</label>
+          <input type="text" x-model="form.shopify_store_url"
+                 class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+                 placeholder="mi-tienda.myshopify.com" />
+        </div>
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Access Token (cifrado)</label>
+          <input type="password" x-model="form.shopify_access_token"
+                 class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+                 placeholder="shpat_••••••••" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Meta Ads -->
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+      <h2 class="font-semibold text-white mb-4 flex items-center gap-2">
+        <span class="text-xl">📣</span> Meta Ads (Facebook/Instagram)
+      </h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">App ID</label>
+          <input type="text" x-model="form.meta_app_id"
+                 class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500" />
+        </div>
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">App Secret</label>
+          <input type="password" x-model="form.meta_app_secret"
+                 class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500" />
+        </div>
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Access Token</label>
+          <input type="password" x-model="form.meta_access_token"
+                 class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500" />
+        </div>
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Ad Account ID</label>
+          <input type="text" x-model="form.meta_ad_account_id"
+                 class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+                 placeholder="act_1234567890" />
+        </div>
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Pixel ID</label>
+          <input type="text" x-model="form.meta_pixel_id"
+                 class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500" />
+        </div>
+      </div>
+    </div>
+
+    <!-- WhatsApp -->
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+      <h2 class="font-semibold text-white mb-4 flex items-center gap-2">
+        <span class="text-xl">📱</span> WhatsApp Business API
+      </h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Phone Number ID</label>
+          <input type="text" x-model="form.waba_phone_number_id"
+                 class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500" />
+        </div>
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Token de acceso</label>
+          <input type="password" x-model="form.waba_token"
+                 class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500" />
+        </div>
+        <div class="md:col-span-2">
+          <label class="block text-sm text-gray-400 mb-1">Verify Token (para webhooks)</label>
+          <input type="text" x-model="form.waba_verify_token"
+                 class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+                 placeholder="mi_token_secreto_123" />
+          <p class="text-xs text-gray-600 mt-1">
+            URL de webhook: <span class="font-mono text-indigo-400" x-text="location.origin + '/bot/whatsapp/webhook/TU-TENANT-ID'"></span>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dropi -->
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+      <h2 class="font-semibold text-white mb-4 flex items-center gap-2">
+        <span class="text-xl">📦</span> Dropi
+      </h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">API Key</label>
+          <input type="password" x-model="form.dropi_api_key"
+                 class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500" />
+        </div>
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Store ID</label>
+          <input type="text" x-model="form.dropi_store_id"
+                 class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500" />
+        </div>
+      </div>
+    </div>
+
+    <!-- SMTP -->
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+      <h2 class="font-semibold text-white mb-4 flex items-center gap-2">
+        <span class="text-xl">📧</span> Correo SMTP
+      </h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Servidor SMTP</label>
+          <input type="text" x-model="form.smtp_host"
+                 class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+                 placeholder="smtp.gmail.com" />
+        </div>
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Puerto</label>
+          <input type="number" x-model="form.smtp_port"
+                 class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+                 placeholder="587" />
+        </div>
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Usuario</label>
+          <input type="text" x-model="form.smtp_user"
+                 class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+                 placeholder="tu@email.com" />
+        </div>
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Contraseña</label>
+          <input type="password" x-model="form.smtp_password"
+                 class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500" />
+        </div>
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Nombre del remitente</label>
+          <input type="text" x-model="form.smtp_from_name"
+                 class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+                 placeholder="Mi Tienda" />
+        </div>
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Email del remitente</label>
+          <input type="email" x-model="form.smtp_from_email"
+                 class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+                 placeholder="noreply@mitienda.com" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Guardar -->
+    <div class="flex items-center gap-4">
+      <button @click="guardar" :disabled="guardando"
+              class="px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl transition-colors disabled:opacity-50">
+        <span x-text="guardando ? 'Guardando...' : 'Guardar configuración'"></span>
+      </button>
+      <span x-show="guardadoOk" class="text-green-400 text-sm">✓ Guardado correctamente</span>
+      <span x-show="errorMsg" class="text-red-400 text-sm" x-text="errorMsg"></span>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const token = localStorage.getItem('access_token');
+  if (!token) window.location.href = '/auth/iniciar-sesion';
+
+  function config() {
+    return {
+      form: {}, guardando: false, guardadoOk: false, errorMsg: '',
+      async cargar() {
+        try {
+          const resp = await fetch('/tenant/config', { headers: { Authorization: 'Bearer ' + token } });
+          if (resp.ok) {
+            const data = await resp.json();
+            this.form = { ...data };
+          }
+        } catch {}
+      },
+      async guardar() {
+        this.guardando = true; this.guardadoOk = false; this.errorMsg = '';
+        try {
+          const resp = await fetch('/tenant/config', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+            body: JSON.stringify(this.form),
+          });
+          if (!resp.ok) { this.errorMsg = 'Error al guardar'; return; }
+          this.guardadoOk = true;
+          setTimeout(() => this.guardadoOk = false, 3000);
+        } finally { this.guardando = false; }
+      },
+    };
+  }
+</script>
+{% endblock %}

@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block title %}Productos{% endblock %}
+{% block page_title %}📦 Productos{% endblock %}
+
+{% block topbar_actions %}
+<button @click="modalNuevo = true"
+        class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition-colors">
+  + Nuevo producto
+</button>
+{% endblock %}
+
+{% block content %}
+<div x-data="productos()" x-init="cargar()">
+
+  <!-- Modal nuevo producto -->
+  <div x-show="modalNuevo" x-cloak
+       class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-8 w-full max-w-lg">
+      <h2 class="text-xl font-bold text-white mb-6">Nuevo producto</h2>
+      <form @submit.prevent="crearProducto">
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-300 mb-2">Nombre del producto *</label>
+            <input type="text" x-model="form.nombre" required
+                   class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+                   placeholder="Ej: Licuadora Portátil Pro 1000W" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-300 mb-2">Descripción para la IA</label>
+            <textarea x-model="form.descripcion_input" rows="3"
+                      class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 resize-none"
+                      placeholder="Describe el producto, sus beneficios clave, público objetivo..."></textarea>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-300 mb-2">Precio (USD)</label>
+              <input type="number" step="0.01" x-model="form.precio"
+                     class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+                     placeholder="29.99" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-300 mb-2">Inventario</label>
+              <input type="number" x-model="form.inventario"
+                     class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+                     placeholder="100" />
+            </div>
+          </div>
+        </div>
+
+        <div x-show="error" class="mt-4 px-4 py-3 bg-red-900/50 text-red-300 border border-red-800 rounded-lg text-sm" x-text="error"></div>
+
+        <div class="flex gap-3 mt-6">
+          <button type="button" @click="modalNuevo = false"
+                  class="flex-1 px-4 py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl transition-colors">
+            Cancelar
+          </button>
+          <button type="submit" :disabled="cargando"
+                  class="flex-1 px-4 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl transition-colors disabled:opacity-50">
+            <span x-text="cargando ? 'Creando...' : 'Crear y generar contenido'"></span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Lista de productos -->
+  <div class="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
+      <span class="text-sm text-gray-400" x-text="total + ' productos'"></span>
+    </div>
+
+    <div x-show="cargandoLista" class="py-16 text-center text-gray-500">Cargando productos...</div>
+
+    <div x-show="!cargandoLista && items.length === 0" class="py-16 text-center">
+      <p class="text-gray-500 text-lg">No tienes productos aún</p>
+      <p class="text-gray-600 text-sm mt-1">Crea tu primer producto para comenzar</p>
+    </div>
+
+    <table x-show="!cargandoLista && items.length > 0" class="w-full">
+      <thead class="bg-gray-800/50">
+        <tr>
+          <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Producto</th>
+          <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Precio</th>
+          <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Contenido IA</th>
+          <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Shopify</th>
+          <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-800">
+        <template x-for="p in items" :key="p.id">
+          <tr class="hover:bg-gray-800/30 transition-colors">
+            <td class="px-6 py-4">
+              <p class="font-medium text-white" x-text="p.nombre"></p>
+              <p class="text-xs text-gray-500 mt-1" x-text="'Stock: ' + p.inventario + ' unidades'"></p>
+            </td>
+            <td class="px-6 py-4 text-gray-300" x-text="p.precio ? '$' + p.precio : '—'"></td>
+            <td class="px-6 py-4">
+              <span :class="p.contenido_generado ? 'bg-green-900/50 text-green-400 border-green-800' : 'bg-yellow-900/50 text-yellow-400 border-yellow-800'"
+                    class="px-2 py-1 rounded-full text-xs border"
+                    x-text="p.contenido_generado ? '✓ Listo' : '⏳ Generando'"></span>
+            </td>
+            <td class="px-6 py-4">
+              <span x-show="p.shopify_url">
+                <a :href="p.shopify_url" target="_blank" class="text-indigo-400 hover:text-indigo-300 text-sm">Ver en tienda ↗</a>
+              </span>
+              <span x-show="!p.shopify_url" class="text-gray-600 text-sm">No publicado</span>
+            </td>
+            <td class="px-6 py-4">
+              <button @click="eliminar(p.id)"
+                      class="text-red-400 hover:text-red-300 text-sm transition-colors">Eliminar</button>
+            </td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const token = localStorage.getItem('access_token');
+  if (!token) window.location.href = '/auth/iniciar-sesion';
+
+  function productos() {
+    return {
+      items: [], total: 0,
+      modalNuevo: false, cargando: false, cargandoLista: true,
+      error: '',
+      form: { nombre: '', descripcion_input: '', precio: '', inventario: 0 },
+
+      async cargar() {
+        this.cargandoLista = true;
+        try {
+          const resp = await fetch('/productos/', { headers: { Authorization: 'Bearer ' + token } });
+          if (resp.status === 401) { window.location.href = '/auth/iniciar-sesion'; return; }
+          const data = await resp.json();
+          this.items = data.items;
+          this.total = data.total;
+        } finally { this.cargandoLista = false; }
+      },
+
+      async crearProducto() {
+        this.cargando = true; this.error = '';
+        try {
+          const body = { ...this.form, precio: this.form.precio ? parseFloat(this.form.precio) : null, inventario: parseInt(this.form.inventario) || 0 };
+          const resp = await fetch('/productos/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+            body: JSON.stringify(body),
+          });
+          if (!resp.ok) { this.error = (await resp.json()).detail || 'Error al crear'; return; }
+          this.modalNuevo = false;
+          this.form = { nombre: '', descripcion_input: '', precio: '', inventario: 0 };
+          await this.cargar();
+        } finally { this.cargando = false; }
+      },
+
+      async eliminar(id) {
+        if (!confirm('¿Eliminar este producto?')) return;
+        await fetch('/productos/' + id, { method: 'DELETE', headers: { Authorization: 'Bearer ' + token } });
+        await this.cargar();
+      }
+    };
+  }
+</script>
+{% endblock %}

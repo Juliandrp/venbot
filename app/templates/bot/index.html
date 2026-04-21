@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Bot de Ventas{% endblock %}
+{% block page_title %}🤖 Bot de Ventas{% endblock %}
+
+{% block content %}
+<div x-data="botView()" x-init="cargar()">
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+    <!-- Lista de conversaciones -->
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+      <div class="px-4 py-4 border-b border-gray-800">
+        <h2 class="font-semibold text-white">Conversaciones</h2>
+      </div>
+      <div x-show="cargando" class="py-8 text-center text-gray-500 text-sm">Cargando...</div>
+      <div x-show="!cargando && conversaciones.length === 0" class="py-8 text-center text-gray-500 text-sm">
+        Sin conversaciones aún
+      </div>
+      <div class="divide-y divide-gray-800 overflow-y-auto max-h-[600px]">
+        <template x-for="conv in conversaciones" :key="conv.id">
+          <div @click="seleccionar(conv)"
+               class="px-4 py-3 cursor-pointer hover:bg-gray-800 transition-colors"
+               :class="seleccionada?.id === conv.id ? 'bg-gray-800' : ''">
+            <div class="flex items-center justify-between">
+              <span class="font-medium text-sm text-white" x-text="conv.canal === 'whatsapp' ? '📱 WhatsApp' : '💬 Messenger'"></span>
+              <span :class="conv.estado === 'activa' ? 'text-green-400' : conv.estado === 'transferida' ? 'text-yellow-400' : 'text-gray-500'"
+                    class="text-xs" x-text="conv.estado"></span>
+            </div>
+            <p class="text-xs text-gray-500 mt-1" x-text="conv.id.substring(0, 8) + '...'"></p>
+            <div x-show="conv.venta_cerrada" class="text-xs text-green-400 mt-1">✅ Venta cerrada</div>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- Detalle conversación -->
+    <div class="md:col-span-2 bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden flex flex-col">
+      <div class="px-6 py-4 border-b border-gray-800">
+        <h2 class="font-semibold text-white" x-text="seleccionada ? 'Conversación: ' + seleccionada.id.substring(0, 8) : 'Selecciona una conversación'"></h2>
+      </div>
+      <div x-show="!seleccionada" class="flex-1 flex items-center justify-center text-gray-500">
+        Selecciona una conversación para ver el historial
+      </div>
+      <div x-show="seleccionada" class="flex-1 flex flex-col">
+        <div class="flex-1 p-4 space-y-3 overflow-y-auto max-h-[480px]">
+          <template x-for="msg in mensajes" :key="msg.id">
+            <div :class="msg.rol === 'cliente' ? 'flex justify-start' : 'flex justify-end'">
+              <div :class="msg.rol === 'cliente'
+                            ? 'bg-gray-800 text-gray-200'
+                            : msg.rol === 'bot'
+                              ? 'bg-indigo-600 text-white'
+                              : 'bg-yellow-600 text-white'"
+                   class="max-w-xs px-4 py-2 rounded-2xl text-sm">
+                <p x-text="msg.contenido"></p>
+                <p class="text-xs opacity-60 mt-1"
+                   x-text="(msg.rol === 'bot' ? '🤖 Bot' : msg.rol === 'humano' ? '👤 Agente' : '👤 Cliente') + (msg.confianza ? ' · ' + Math.round(parseFloat(msg.confianza) * 100) + '%' : '')">
+                </p>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const token = localStorage.getItem('access_token');
+  if (!token) window.location.href = '/auth/iniciar-sesion';
+
+  function botView() {
+    return {
+      conversaciones: [], seleccionada: null, mensajes: [], cargando: true,
+      async cargar() {
+        try {
+          const resp = await fetch('/bot/conversaciones', { headers: { Authorization: 'Bearer ' + token } });
+          if (resp.status === 401) { window.location.href = '/auth/iniciar-sesion'; return; }
+          this.conversaciones = await resp.json();
+        } finally { this.cargando = false; }
+      },
+      seleccionar(conv) {
+        this.seleccionada = conv;
+        this.mensajes = [];
+      }
+    };
+  }
+</script>
+{% endblock %}
