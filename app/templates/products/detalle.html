@@ -220,14 +220,26 @@
         </div>
 
         <!-- Imágenes generadas por IA -->
-        <div x-show="(p?.contenido?.imagenes_generadas || []).length > 0" class="bg-gray-900 border border-gray-800 rounded-2xl p-5">
-          <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Imágenes generadas por IA (DALL-E)</h3>
-          <div class="grid grid-cols-3 gap-3">
+        <div x-show="p?.contenido_generado" class="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+          <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Imágenes generadas por IA</h3>
+          <div x-show="(p?.contenido?.imagenes_generadas || []).length > 0" class="grid grid-cols-3 gap-3">
             <template x-for="img in (p?.contenido?.imagenes_generadas || [])" :key="img">
               <a :href="img" target="_blank">
                 <img :src="img" class="w-full aspect-square object-cover rounded-xl border border-gray-700 hover:border-indigo-500 transition-colors" />
               </a>
             </template>
+          </div>
+          <div x-show="(p?.contenido?.imagenes_generadas || []).length === 0"
+               class="rounded-xl border border-dashed border-gray-700 p-5 text-sm text-gray-500 space-y-2">
+            <p>No se generaron imágenes IA para este producto.</p>
+            <p class="text-xs">
+              Para generar imágenes automáticas necesitas configurar una API key en
+              <a href="/dashboard/configuracion" class="text-indigo-400 hover:underline">Configuración</a>:
+            </p>
+            <ul class="text-xs space-y-1 ml-3">
+              <li>• <span class="text-indigo-300">Gemini seleccionado</span> → activa <strong>Imagen 3</strong> (misma key de Gemini que ya tienes)</li>
+              <li>• <span class="text-gray-400">Claude / ChatGPT seleccionado</span> → agrega tu key de <strong>OpenAI</strong> para usar DALL-E 3</li>
+            </ul>
           </div>
         </div>
 

@@ -91,23 +91,53 @@ async def _pipeline(product_id: str, tenant_id: str):
         contenido.video_script = datos.get("video_script")
         await db.commit()
 
-        # ── Paso 2: DALL-E 3 — imágenes ────────────────────────────────
-        openai_key = None
+        # ── Paso 2: Imágenes IA (Imagen 3 si proveedor=gemini, DALL-E si OpenAI) ──
         from app.config import settings
-        if settings.openai_api_key:
-            openai_key = settings.openai_api_key
+        urls_imagenes = []
 
-        try:
-            urls_imagenes = await generar_imagenes_producto(
-                nombre=producto.nombre,
-                descripcion=producto.descripcion_input or "",
-                cantidad=3,
-                api_key=openai_key,
-            )
+        if ai_provider == "gemini":
+            # Imagen 3 usa la misma key de Gemini
+            gemini_img_key = None
+            if config and config.gemini_api_key_enc:
+                gemini_img_key = decrypt_secret(config.gemini_api_key_enc)
+            elif settings.gemini_api_key:
+                gemini_img_key = settings.gemini_api_key
+
+            if gemini_img_key:
+                try:
+                    from app.services.imagen_service import generar_imagenes_producto as imagen_generar
+                    urls_imagenes = await imagen_generar(
+                        nombre=producto.nombre,
+                        descripcion=producto.descripcion_input or "",
+                        tenant_id=tenant_id,
+                        product_id=product_id,
+                        cantidad=3,
+                        api_key=gemini_img_key,
+                    )
+                except Exception:
+                    pass
+        else:
+            # DALL-E 3 (requiere OpenAI key)
+            openai_key = None
+            if config and config.openai_api_key_enc:
+                openai_key = decrypt_secret(config.openai_api_key_enc)
+            elif settings.openai_api_key:
+                openai_key = settings.openai_api_key
+
+            if openai_key:
+                try:
+                    urls_imagenes = await generar_imagenes_producto(
+                        nombre=producto.nombre,
+                        descripcion=producto.descripcion_input or "",
+                        cantidad=3,
+                        api_key=openai_key,
+                    )
+                except Exception:
+                    pass
+
+        if urls_imagenes:
             contenido.imagenes_generadas = urls_imagenes
             await db.commit()
-        except Exception:
-            pass  # No bloquear si falla la generación de imágenes
 
         # ── Paso 3: Video con Kling (por defecto) o HeyGen ─────────────────
         video_provider = (config.video_provider if config else None) or "kling"
