@@ -3,14 +3,14 @@
 {% block page_title %}📦 Productos{% endblock %}
 
 {% block topbar_actions %}
-<button @click="modalNuevo = true"
+<button @click="$dispatch('abrir-modal-producto')"
         class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition-colors">
   + Nuevo producto
 </button>
 {% endblock %}
 
 {% block content %}
-<div x-data="productos()" x-init="cargar()">
+<div x-data="productos()" x-init="cargar()" @abrir-modal-producto.window="modalNuevo = true">
 
   <!-- Modal nuevo producto -->
   <div x-show="modalNuevo" x-cloak
@@ -143,16 +143,27 @@
       async crearProducto() {
         this.cargando = true; this.error = '';
         try {
-          const body = { ...this.form, precio: this.form.precio ? parseFloat(this.form.precio) : null, inventario: parseInt(this.form.inventario) || 0 };
+          const body = {
+            nombre: this.form.nombre,
+            descripcion_input: this.form.descripcion_input || null,
+            precio: this.form.precio ? parseFloat(this.form.precio) : null,
+            inventario: parseInt(this.form.inventario) || 0,
+          };
           const resp = await fetch('/productos/', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
             body: JSON.stringify(body),
           });
-          if (!resp.ok) { this.error = (await resp.json()).detail || 'Error al crear'; return; }
+          if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            this.error = err.detail || `Error ${resp.status} al crear el producto`;
+            return;
+          }
           this.modalNuevo = false;
           this.form = { nombre: '', descripcion_input: '', precio: '', inventario: 0 };
           await this.cargar();
+        } catch (e) {
+          this.error = 'Error de conexión: ' + e.message;
         } finally { this.cargando = false; }
       },
 
