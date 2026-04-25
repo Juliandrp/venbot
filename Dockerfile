@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
     curl \
+    bash \
     && rm -rf /var/lib/apt/lists/*
 
 # Python deps
@@ -16,9 +17,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # App code
 COPY . .
 
-# Create media directory
-RUN mkdir -p /app/media
+# Directorios de runtime y permisos al script de arranque
+RUN mkdir -p /app/media /app/celerybeat /var/log \
+    && chmod +x /app/start.sh
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# start.sh lanza migraciones + celery worker + celery beat + uvicorn
+CMD ["bash", "/app/start.sh"]
