@@ -9,6 +9,8 @@ from app.core.deps import get_current_tenant
 from app.models.tenant import Tenant
 from app.models.campaign import Campaign, CampaignStatus
 from app.models.order import Order, OrderStatus
+from app.models.product import Product
+from app.models.bot import Conversation, ConversationStatus
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 templates = Jinja2Templates(directory="app/templates")
@@ -55,12 +57,28 @@ async def resumen(
     )
     pedidos_hoy = result.scalar()
 
+    result = await db.execute(
+        select(func.count()).select_from(Product).where(Product.tenant_id == tenant.id)
+    )
+    total_productos = result.scalar()
+
+    result = await db.execute(
+        select(func.count()).select_from(Conversation).where(
+            Conversation.tenant_id == tenant.id,
+            Conversation.estado == ConversationStatus.activa,
+        )
+    )
+    conversaciones_activas = result.scalar()
+
     return {
         "revenue_hoy": revenue_hoy,
         "revenue_semana": revenue_semana,
         "revenue_mes": revenue_mes,
         "campanas_activas": campanas_activas,
         "pedidos_hoy": pedidos_hoy,
+        "total_productos": total_productos,
+        "conversaciones_activas": conversaciones_activas,
+        "plan": tenant.estado_suscripcion.value,
     }
 
 
@@ -89,3 +107,13 @@ async def vista_pedidos(request: Request):
 @router.get("/configuracion")
 async def vista_configuracion(request: Request):
     return templates.TemplateResponse("settings/index.html", {"request": request})
+
+
+@router.get("/clientes")
+async def vista_clientes_dashboard(request: Request):
+    return templates.TemplateResponse("customers/index.html", {"request": request})
+
+
+@router.get("/plan")
+async def vista_plan_tenant(request: Request):
+    return templates.TemplateResponse("billing/index.html", {"request": request})

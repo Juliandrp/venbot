@@ -30,6 +30,9 @@ async def crear_campana(
     tenant: Tenant = Depends(get_current_tenant),
     db: AsyncSession = Depends(get_db),
 ):
+    from app.services.plan_limits import verificar_puede_crear_campana
+    await verificar_puede_crear_campana(tenant, db)
+
     campana = Campaign(
         tenant_id=tenant.id,
         nombre=data.nombre,

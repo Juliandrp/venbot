@@ -1,10 +1,7 @@
 """Generación de imágenes con Google Imagen 3 (via Gemini API)."""
-import base64
-import os
 import uuid
 from app.config import settings
-
-MEDIA_ROOT = "/app/media"
+from app.services.storage import storage
 
 
 async def generar_imagenes_producto(
@@ -17,7 +14,7 @@ async def generar_imagenes_producto(
 ) -> list[str]:
     """
     Genera imágenes publicitarias con Imagen 3.
-    Guarda los archivos en disco y retorna URLs relativas /media/...
+    Retorna URLs públicas (depende del backend de storage).
     """
     from google import genai
     from google.genai import types
@@ -29,9 +26,6 @@ async def generar_imagenes_producto(
         "lifestyle photography, product in use, modern Latin American setting, natural light",
         "advertising image, vibrant colors, product as hero, no text, high contrast",
     ]
-
-    directorio = os.path.join(MEDIA_ROOT, "productos", tenant_id, product_id, "ia")
-    os.makedirs(directorio, exist_ok=True)
 
     urls: list[str] = []
     for i in range(min(cantidad, len(estilos))):
@@ -54,10 +48,8 @@ async def generar_imagenes_producto(
             )
             for img in response.generated_images:
                 nombre_archivo = f"imagen3_{i}_{uuid.uuid4().hex[:8]}.png"
-                ruta = os.path.join(directorio, nombre_archivo)
-                with open(ruta, "wb") as f:
-                    f.write(img.image.image_bytes)
-                url = f"/media/productos/{tenant_id}/{product_id}/ia/{nombre_archivo}"
+                key = f"productos/{tenant_id}/{product_id}/ia/{nombre_archivo}"
+                url = await storage.guardar_bytes(key, img.image.image_bytes, "image/png")
                 urls.append(url)
         except Exception:
             continue

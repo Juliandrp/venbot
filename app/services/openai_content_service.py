@@ -1,27 +1,24 @@
 """Generación de contenido IA via OpenAI (GPT-4o)."""
 import json
 import base64
-import os
+import mimetypes
 from openai import AsyncOpenAI
 from tenacity import retry, stop_after_attempt, wait_exponential
 from app.config import settings
-
-MEDIA_ROOT = "/app/media"
+from app.services.storage import leer_url_como_bytes
 
 
 def _get_client(api_key: str | None = None) -> AsyncOpenAI:
     return AsyncOpenAI(api_key=api_key or settings.openai_api_key)
 
 
-def _url_a_base64(url_relativa: str) -> dict | None:
-    ruta = os.path.join(MEDIA_ROOT, url_relativa.lstrip("/media/"))
-    if not os.path.exists(ruta):
+async def _url_a_base64(url: str) -> dict | None:
+    datos = await leer_url_como_bytes(url)
+    if not datos:
         return None
-    import mimetypes
-    mime = mimetypes.guess_type(ruta)[0] or "image/jpeg"
-    with open(ruta, "rb") as f:
-        datos = base64.standard_b64encode(f.read()).decode()
-    return {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{datos}"}}
+    mime = mimetypes.guess_type(url)[0] or "image/jpeg"
+    b64 = base64.standard_b64encode(datos).decode()
+    return {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}}
 
 
 SYSTEM_PROMPT = """Eres un experto en marketing digital y copywriting para e-commerce latinoamericano.
@@ -59,7 +56,7 @@ Genera el siguiente JSON (sin markdown):
     content: list = []
     if image_urls:
         for url in image_urls[:4]:
-            bloque = _url_a_base64(url)
+            bloque = await _url_a_base64(url)
             if bloque:
                 content.append(bloque)
     content.append({"type": "text", "text": prompt_text})

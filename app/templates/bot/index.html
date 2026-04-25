@@ -1,63 +1,113 @@
 {% extends "base.html" %}
 {% block title %}Bot de Ventas{% endblock %}
-{% block page_title %}🤖 Bot de Ventas{% endblock %}
+{% block page_title %}Bot de Ventas{% endblock %}
 
 {% block content %}
 <div x-data="botView()" x-init="cargar()">
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6" style="height: calc(100vh - 160px)">
 
     <!-- Lista de conversaciones -->
-    <div class="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-      <div class="px-4 py-4 border-b border-gray-800">
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden flex flex-col">
+      <div class="px-4 py-4 border-b border-gray-800 flex items-center justify-between">
         <h2 class="font-semibold text-white">Conversaciones</h2>
+        <span class="text-xs text-gray-500" x-text="conversaciones.length + ' total'"></span>
       </div>
       <div x-show="cargando" class="py-8 text-center text-gray-500 text-sm">Cargando...</div>
       <div x-show="!cargando && conversaciones.length === 0" class="py-8 text-center text-gray-500 text-sm">
-        Sin conversaciones aún
+        <div class="text-3xl mb-2">💬</div>
+        Sin conversaciones aún.<br>
+        <span class="text-xs">Los mensajes de WhatsApp aparecerán aquí.</span>
       </div>
-      <div class="divide-y divide-gray-800 overflow-y-auto max-h-[600px]">
+      <div class="flex-1 divide-y divide-gray-800 overflow-y-auto">
         <template x-for="conv in conversaciones" :key="conv.id">
           <div @click="seleccionar(conv)"
                class="px-4 py-3 cursor-pointer hover:bg-gray-800 transition-colors"
-               :class="seleccionada?.id === conv.id ? 'bg-gray-800' : ''">
-            <div class="flex items-center justify-between">
-              <span class="font-medium text-sm text-white" x-text="conv.canal === 'whatsapp' ? '📱 WhatsApp' : '💬 Messenger'"></span>
-              <span :class="conv.estado === 'activa' ? 'text-green-400' : conv.estado === 'transferida' ? 'text-yellow-400' : 'text-gray-500'"
-                    class="text-xs" x-text="conv.estado"></span>
+               :class="seleccionada?.id === conv.id ? 'bg-gray-800 border-l-2 border-indigo-500' : ''">
+            <div class="flex items-center justify-between mb-1">
+              <span class="font-medium text-sm text-white"
+                    x-text="conv.canal === 'whatsapp' ? '📱 WhatsApp' : '💬 Messenger'"></span>
+              <span :class="{
+                'text-green-400': conv.estado === 'activa',
+                'text-yellow-400': conv.estado === 'transferida',
+                'text-gray-500': conv.estado === 'cerrada',
+              }" class="text-xs" x-text="conv.estado"></span>
             </div>
-            <p class="text-xs text-gray-500 mt-1" x-text="conv.id.substring(0, 8) + '...'"></p>
-            <div x-show="conv.venta_cerrada" class="text-xs text-green-400 mt-1">✅ Venta cerrada</div>
+            <p class="text-xs text-gray-500 font-mono" x-text="conv.id.substring(0, 12) + '...'"></p>
+            <div x-show="conv.venta_cerrada" class="text-xs text-green-400 mt-1">Venta cerrada</div>
           </div>
         </template>
       </div>
     </div>
 
-    <!-- Detalle conversación -->
+    <!-- Chat -->
     <div class="md:col-span-2 bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden flex flex-col">
-      <div class="px-6 py-4 border-b border-gray-800">
-        <h2 class="font-semibold text-white" x-text="seleccionada ? 'Conversación: ' + seleccionada.id.substring(0, 8) : 'Selecciona una conversación'"></h2>
-      </div>
-      <div x-show="!seleccionada" class="flex-1 flex items-center justify-center text-gray-500">
-        Selecciona una conversación para ver el historial
-      </div>
-      <div x-show="seleccionada" class="flex-1 flex flex-col">
-        <div class="flex-1 p-4 space-y-3 overflow-y-auto max-h-[480px]">
-          <template x-for="msg in mensajes" :key="msg.id">
-            <div :class="msg.rol === 'cliente' ? 'flex justify-start' : 'flex justify-end'">
-              <div :class="msg.rol === 'cliente'
-                            ? 'bg-gray-800 text-gray-200'
-                            : msg.rol === 'bot'
-                              ? 'bg-indigo-600 text-white'
-                              : 'bg-yellow-600 text-white'"
-                   class="max-w-xs px-4 py-2 rounded-2xl text-sm">
-                <p x-text="msg.contenido"></p>
-                <p class="text-xs opacity-60 mt-1"
-                   x-text="(msg.rol === 'bot' ? '🤖 Bot' : msg.rol === 'humano' ? '👤 Agente' : '👤 Cliente') + (msg.confianza ? ' · ' + Math.round(parseFloat(msg.confianza) * 100) + '%' : '')">
-                </p>
-              </div>
-            </div>
-          </template>
+      <!-- Header -->
+      <div class="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
+        <div>
+          <h2 class="font-semibold text-white"
+              x-text="seleccionada ? (seleccionada.canal === 'whatsapp' ? '📱 WhatsApp · ' : '💬 Messenger · ') + seleccionada.id.substring(0, 8) : 'Conversaciones'"></h2>
+          <p x-show="seleccionada" class="text-xs text-gray-500 mt-0.5"
+             x-text="mensajes.length + ' mensajes'"></p>
         </div>
+        <span x-show="seleccionada" :class="{
+          'bg-green-900/50 text-green-400 border-green-800': seleccionada?.estado === 'activa',
+          'bg-yellow-900/50 text-yellow-400 border-yellow-800': seleccionada?.estado === 'transferida',
+          'bg-gray-800 text-gray-400 border-gray-700': seleccionada?.estado === 'cerrada',
+        }" class="px-2 py-1 rounded-full text-xs border" x-text="seleccionada?.estado"></span>
+      </div>
+
+      <!-- Mensajes -->
+      <div x-show="!seleccionada" class="flex-1 flex items-center justify-center text-gray-500 text-sm">
+        Selecciona una conversación
+      </div>
+      <div x-show="seleccionada && cargandoMsgs" class="flex-1 flex items-center justify-center text-gray-500 text-sm">
+        Cargando mensajes...
+      </div>
+      <div x-show="seleccionada && !cargandoMsgs" class="flex-1 p-4 space-y-3 overflow-y-auto" id="chat-scroll">
+        <template x-for="msg in mensajes" :key="msg.id">
+          <div :class="msg.rol === 'cliente' ? 'flex justify-start' : 'flex justify-end'">
+            <div :class="{
+                  'bg-gray-800 text-gray-200': msg.rol === 'cliente',
+                  'bg-indigo-600 text-white': msg.rol === 'bot',
+                  'bg-yellow-700 text-white': msg.rol === 'humano',
+                 }"
+                 class="max-w-sm px-4 py-2.5 rounded-2xl text-sm">
+              <p x-text="msg.contenido" style="white-space: pre-wrap;"></p>
+              <p class="text-xs opacity-50 mt-1"
+                 x-text="(msg.rol === 'bot' ? 'Bot' : msg.rol === 'humano' ? 'Agente' : 'Cliente') + (msg.confianza ? ' · ' + Math.round(parseFloat(msg.confianza)*100) + '%' : '')"></p>
+            </div>
+          </div>
+        </template>
+        <div x-show="mensajes.length === 0" class="py-8 text-center text-gray-600 text-sm">
+          Esta conversación no tiene mensajes aún.
+        </div>
+      </div>
+
+      <!-- Input de respuesta del agente humano -->
+      <div x-show="seleccionada && seleccionada.estado !== 'cerrada'"
+           class="border-t border-gray-800 p-3 bg-gray-900">
+        <div x-show="errorEnvio" class="mb-2 text-xs text-red-400" x-text="errorEnvio"></div>
+        <div class="flex gap-2 items-end">
+          <textarea x-model="textoRespuesta" rows="2"
+                    @keydown.enter.prevent.exact="enviar()"
+                    placeholder="Escribe tu respuesta como agente humano... (Enter para enviar, Shift+Enter para nueva línea)"
+                    :disabled="enviando"
+                    class="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 text-sm resize-none disabled:opacity-50"></textarea>
+          <button @click="enviar()" :disabled="enviando || !textoRespuesta.trim()"
+                  class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+                  x-text="enviando ? 'Enviando...' : 'Enviar'"></button>
+          <button @click="cerrar()" :disabled="enviando" title="Cerrar conversación"
+                  class="px-3 py-2.5 bg-gray-800 hover:bg-red-700 text-gray-400 hover:text-white text-sm rounded-xl transition-colors flex-shrink-0">
+            ✕
+          </button>
+        </div>
+        <p class="text-xs text-gray-600 mt-1.5">
+          Al responder, la conversación pasa a estado <strong>transferida</strong> (el bot deja de responder automáticamente).
+        </p>
+      </div>
+      <div x-show="seleccionada && seleccionada.estado === 'cerrada'"
+           class="border-t border-gray-800 p-4 bg-gray-900 text-center text-xs text-gray-500">
+        Conversación cerrada
       </div>
     </div>
   </div>
@@ -66,23 +116,71 @@
 
 {% block scripts %}
 <script>
-  const token = localStorage.getItem('access_token');
-  if (!token) window.location.href = '/auth/iniciar-sesion';
+  requireAuth();
 
   function botView() {
     return {
-      conversaciones: [], seleccionada: null, mensajes: [], cargando: true,
+      conversaciones: [], seleccionada: null, mensajes: [],
+      cargando: true, cargandoMsgs: false,
+      textoRespuesta: '', enviando: false, errorEnvio: '',
+
       async cargar() {
-        try {
-          const resp = await fetch('/bot/conversaciones', { headers: { Authorization: 'Bearer ' + token } });
-          if (resp.status === 401) { window.location.href = '/auth/iniciar-sesion'; return; }
-          this.conversaciones = await resp.json();
-        } finally { this.cargando = false; }
+        const resp = await apiFetch('/bot/conversaciones');
+        if (resp && resp.ok) this.conversaciones = await resp.json();
+        this.cargando = false;
       },
-      seleccionar(conv) {
+
+      async seleccionar(conv) {
         this.seleccionada = conv;
         this.mensajes = [];
-      }
+        this.textoRespuesta = '';
+        this.errorEnvio = '';
+        this.cargandoMsgs = true;
+        const resp = await apiFetch('/bot/conversaciones/' + conv.id + '/mensajes');
+        if (resp && resp.ok) this.mensajes = await resp.json();
+        this.cargandoMsgs = false;
+        this._scrollDown();
+      },
+
+      _scrollDown() {
+        this.$nextTick(() => {
+          const el = document.getElementById('chat-scroll');
+          if (el) el.scrollTop = el.scrollHeight;
+        });
+      },
+
+      async enviar() {
+        const texto = this.textoRespuesta.trim();
+        if (!texto || !this.seleccionada || this.enviando) return;
+        this.enviando = true; this.errorEnvio = '';
+        const resp = await apiFetch('/bot/conversaciones/' + this.seleccionada.id + '/responder', {
+          method: 'POST',
+          body: JSON.stringify({ texto }),
+        });
+        if (resp && resp.ok) {
+          const msg = await resp.json();
+          this.mensajes.push({
+            id: msg.id, rol: msg.rol, contenido: msg.contenido,
+            confianza: null, created_at: msg.created_at,
+          });
+          this.textoRespuesta = '';
+          this.seleccionada.estado = 'transferida';
+          if (msg.error) this.errorEnvio = msg.error + ' (mensaje guardado pero no enviado al canal)';
+          this._scrollDown();
+        } else if (resp) {
+          const err = await resp.json().catch(() => ({}));
+          this.errorEnvio = err.detail || 'Error al enviar';
+        }
+        this.enviando = false;
+      },
+
+      async cerrar() {
+        if (!confirm('¿Cerrar esta conversación?')) return;
+        const resp = await apiFetch('/bot/conversaciones/' + this.seleccionada.id + '/cerrar', { method: 'POST' });
+        if (resp && resp.ok) {
+          this.seleccionada.estado = 'cerrada';
+        }
+      },
     };
   }
 </script>

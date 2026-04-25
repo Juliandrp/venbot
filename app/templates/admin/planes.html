@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% block title %}Planes de Suscripción{% endblock %}
+{% block page_title %}Planes de Suscripción{% endblock %}
+
+{% block topbar_actions %}
+<div class="flex items-center gap-2">
+  <a href="/admin/" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm rounded-lg">← Tenants</a>
+  <button @click="$dispatch('abrir-modal-plan')"
+          class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg">
+    + Nuevo plan
+  </button>
+</div>
+{% endblock %}
+
+{% block content %}
+<div x-data="planesAdmin()" x-init="cargar()" @abrir-modal-plan.window="abrirModal()">
+
+  <div x-show="cargando" class="py-12 text-center text-gray-500">Cargando...</div>
+
+  <div x-show="!cargando && planes.length === 0" class="py-16 text-center">
+    <div class="text-4xl mb-3">💳</div>
+    <p class="text-gray-500">Aún no hay planes de suscripción definidos</p>
+    <p class="text-gray-600 text-sm mt-1">Crea el primero para que los tenants puedan elegir un plan al registrarse.</p>
+  </div>
+
+  <div x-show="!cargando && planes.length > 0" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <template x-for="p in planes" :key="p.id">
+      <div :class="p.activo ? 'border-indigo-700' : 'border-gray-800 opacity-60'"
+           class="bg-gray-900 border-2 rounded-2xl p-6 relative">
+        <div class="flex items-start justify-between mb-3">
+          <div>
+            <h3 class="text-lg font-bold text-white" x-text="p.nombre"></h3>
+            <p class="text-xs text-gray-500 uppercase tracking-wider mt-0.5" x-text="p.tier"></p>
+          </div>
+          <span :class="p.activo ? 'bg-green-900/50 text-green-400' : 'bg-gray-800 text-gray-500'"
+                class="px-2 py-1 rounded-full text-xs"
+                x-text="p.activo ? 'Activo' : 'Inactivo'"></span>
+        </div>
+
+        <div class="my-4">
+          <span class="text-3xl font-bold text-white" x-text="'$' + p.precio_mensual_usd"></span>
+          <span class="text-sm text-gray-500"> USD / mes</span>
+        </div>
+
+        <ul class="space-y-2 text-sm text-gray-300">
+          <li>📦 <span x-text="p.max_productos"></span> productos</li>
+          <li>📣 <span x-text="p.max_campanas"></span> campañas activas</li>
+          <li>💬 <span x-text="p.max_mensajes_bot.toLocaleString('es-CO')"></span> mensajes bot/mes</li>
+        </ul>
+
+        <div class="flex gap-2 mt-5">
+          <button @click="editar(p)" class="flex-1 px-3 py-2 bg-gray-800 hover:bg-indigo-700 text-gray-300 hover:text-white text-sm rounded-lg">
+            Editar
+          </button>
+          <button @click="eliminar(p.id, p.nombre)" class="px-3 py-2 bg-gray-800 hover:bg-red-700 text-gray-400 hover:text-white text-sm rounded-lg">
+            ✕
+          </button>
+        </div>
+      </div>
+    </template>
+  </div>
+
+  <!-- Modal -->
+  <div x-show="modal" x-transition.opacity
+       class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+       @click.self="modal = false">
+    <div class="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-md shadow-2xl">
+      <div class="flex items-center justify-between mb-6">
+        <h3 class="text-lg font-semibold text-white" x-text="form.id ? 'Editar plan' : 'Nuevo plan'"></h3>
+        <button @click="modal = false" class="text-gray-500 hover:text-white text-xl leading-none">&times;</button>
+      </div>
+
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Nombre del plan</label>
+          <input type="text" x-model="form.nombre"
+                 class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-indigo-500"
+                 placeholder="Pro, Starter, Enterprise..." />
+        </div>
+
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Tier</label>
+          <select x-model="form.tier" class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-indigo-500">
+            <option value="starter">Starter</option>
+            <option value="pro">Pro</option>
+            <option value="enterprise">Enterprise</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Precio mensual (USD)</label>
+          <input type="number" step="0.01" x-model="form.precio_mensual_usd"
+                 class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-indigo-500"
+                 placeholder="29.99" />
+        </div>
+
+        <div class="grid grid-cols-3 gap-3">
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">Productos</label>
+            <input type="number" x-model="form.max_productos"
+                   class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-indigo-500" />
+          </div>
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">Campañas</label>
+            <input type="number" x-model="form.max_campanas"
+                   class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-indigo-500" />
+          </div>
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">Mensajes/mes</label>
+            <input type="number" x-model="form.max_mensajes_bot"
+                   class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-indigo-500" />
+          </div>
+        </div>
+
+        <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+          <input type="checkbox" x-model="form.activo" class="w-4 h-4 rounded" />
+          Plan activo (visible para tenants)
+        </label>
+
+        <div x-show="errorMsg" class="text-red-400 text-sm" x-text="errorMsg"></div>
+
+        <div class="flex gap-3 pt-2">
+          <button @click="guardar()" :disabled="guardando"
+                  class="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl disabled:opacity-50"
+                  x-text="guardando ? 'Guardando...' : (form.id ? 'Guardar' : 'Crear plan')"></button>
+          <button @click="modal = false" class="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl">
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  requireAuth();
+
+  function planesAdmin() {
+    return {
+      planes: [], cargando: true,
+      modal: false, guardando: false, errorMsg: '',
+      form: { id: null, nombre: '', tier: 'starter', precio_mensual_usd: 0, max_productos: 10, max_campanas: 5, max_mensajes_bot: 1000, activo: true },
+
+      async cargar() {
+        const resp = await apiFetch('/admin/planes');
+        if (resp && resp.status === 403) { window.location.href = '/dashboard/'; return; }
+        if (resp && resp.ok) this.planes = await resp.json();
+        this.cargando = false;
+      },
+
+      abrirModal() {
+        this.errorMsg = '';
+        this.form = { id: null, nombre: '', tier: 'starter', precio_mensual_usd: 0, max_productos: 10, max_campanas: 5, max_mensajes_bot: 1000, activo: true };
+        this.modal = true;
+      },
+
+      editar(p) {
+        this.errorMsg = '';
+        this.form = {
+          id: p.id, nombre: p.nombre, tier: p.tier,
+          precio_mensual_usd: p.precio_mensual_usd,
+          max_productos: p.max_productos, max_campanas: p.max_campanas,
+          max_mensajes_bot: p.max_mensajes_bot, activo: p.activo,
+        };
+        this.modal = true;
+      },
+
+      async guardar() {
+        this.guardando = true; this.errorMsg = '';
+        const url = this.form.id ? '/admin/planes/' + this.form.id : '/admin/planes';
+        const method = this.form.id ? 'PATCH' : 'POST';
+        const resp = await apiFetch(url, { method, body: JSON.stringify(this.form) });
+        if (resp && resp.ok) {
+          this.modal = false;
+          await this.cargar();
+        } else if (resp) {
+          const err = await resp.json().catch(() => ({}));
+          this.errorMsg = err.detail || 'Error al guardar';
+        }
+        this.guardando = false;
+      },
+
+      async eliminar(id, nombre) {
+        if (!confirm('¿Eliminar el plan "' + nombre + '"?')) return;
+        await apiFetch('/admin/planes/' + id, { method: 'DELETE' });
+        await this.cargar();
+      },
+    };
+  }
+</script>
+{% endblock %}

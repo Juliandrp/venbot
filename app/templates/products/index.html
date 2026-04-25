@@ -171,16 +171,23 @@
               <p class="text-xs text-gray-500 mt-1" x-text="'Stock: ' + p.inventario + ' unidades'"></p>
             </td>
             <td class="px-6 py-4 text-gray-300" x-text="p.precio ? '$' + p.precio : '—'"></td>
-            <td class="px-6 py-4">
+            <td class="px-6 py-4 min-w-[160px]">
+              <!-- Listo -->
               <span x-show="p.contenido_generado"
                     class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs border bg-green-900/50 text-green-400 border-green-800">
-                ✓ Listo
+                ✓ Completo
               </span>
-              <span x-show="!p.contenido_generado"
-                    class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs border bg-yellow-900/30 text-yellow-400 border-yellow-800/50">
-                <span class="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse"></span>
-                Generando con IA...
-              </span>
+              <!-- En progreso: barra -->
+              <div x-show="!p.contenido_generado">
+                <div class="flex items-center justify-between text-xs text-gray-400 mb-1">
+                  <span x-text="['Pendiente','Generando copy...','Generando imágenes...','Procesando video...','Publicando...'][p.pipeline_paso] || 'Generando...'"></span>
+                  <span x-text="[0,25,50,75,90][p.pipeline_paso] + '%'"></span>
+                </div>
+                <div class="h-1.5 bg-gray-800 rounded-full overflow-hidden w-32">
+                  <div class="h-full bg-indigo-500 rounded-full transition-all duration-1000 animate-pulse"
+                       :style="'width:' + ([5,25,50,75,90][p.pipeline_paso] || 5) + '%'"></div>
+                </div>
+              </div>
             </td>
             <td class="px-6 py-4">
               <a x-show="p.shopify_url" :href="p.shopify_url" target="_blank"
@@ -205,8 +212,7 @@
 
 {% block scripts %}
 <script>
-  const token = localStorage.getItem('access_token');
-  if (!token) window.location.href = '/auth/iniciar-sesion';
+  requireAuth();
 
   function productos() {
     return {
@@ -287,27 +293,25 @@
             precio: this.form.precio ? parseFloat(this.form.precio) : null,
             inventario: parseInt(this.form.inventario) || 0,
           };
-          const respCrear = await fetch('/productos/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-            body: JSON.stringify(body),
-          });
-          if (!respCrear.ok) {
-            const err = await respCrear.json().catch(() => ({}));
-            this.error = err.detail || `Error ${respCrear.status}`;
+          const respCrear = await apiFetch('/productos/', { method: 'POST', body: JSON.stringify(body) });
+          if (!respCrear || !respCrear.ok) {
+            const err = respCrear ? await respCrear.json().catch(() => ({})) : {};
+            this.error = err.detail || `Error al crear producto`;
             return;
           }
           const producto = await respCrear.json();
           this.progreso = 30;
 
           if (this.archivos.length > 0) {
-            // Paso B: subir imágenes (el endpoint también lanza el pipeline con visión IA)
-            this.mensajeProgreso = `Subiendo ${this.archivos.length} foto(s) y generando contenido con IA...`;
+            // Paso B: subir imágenes — el endpoint lanza el pipeline con visión IA
+            this.mensajeProgreso = `Subiendo ${this.archivos.length} foto(s) y lanzando generación IA...`;
             const fd = new FormData();
             this.archivos.forEach(f => fd.append('imagenes', f));
+            // Para multipart no usamos apiFetch (no puede setear Content-Type=multipart automáticamente)
+            const accessToken = AUTH.getAccessToken();
             const respImg = await fetch(`/productos/${producto.id}/imagenes`, {
               method: 'POST',
-              headers: { Authorization: 'Bearer ' + token },
+              headers: { Authorization: 'Bearer ' + accessToken },
               body: fd,
             });
             if (!respImg.ok) {
@@ -319,11 +323,8 @@
             }
           } else {
             // Sin fotos: lanzar pipeline solo con texto
-            this.mensajeProgreso = 'Generando contenido con IA...';
-            await fetch(`/productos/${producto.id}/regenerar-contenido`, {
-              method: 'POST',
-              headers: { Authorization: 'Bearer ' + token },
-            });
+            this.mensajeProgreso = 'Lanzando generación de contenido IA...';
+            await apiFetch(`/productos/${producto.id}/regenerar-contenido`, { method: 'POST' });
           }
 
           this.progreso = 100;
@@ -340,19 +341,19 @@
 
       async cargar() {
         this.cargandoLista = true;
-        try {
-          const resp = await fetch('/productos/', { headers: { Authorization: 'Bearer ' + token } });
-          if (resp.status === 401) { window.location.href = '/auth/iniciar-sesion'; return; }
+        const resp = await apiFetch('/productos/');
+        if (resp && resp.ok) {
           const data = await resp.json();
           this.items = data.items;
           this.total = data.total;
           this._programarRefresh();
-        } finally { this.cargandoLista = false; }
+        }
+        this.cargandoLista = false;
       },
 
       async eliminar(id) {
         if (!confirm('¿Eliminar este producto?')) return;
-        await fetch('/productos/' + id, { method: 'DELETE', headers: { Authorization: 'Bearer ' + token } });
+        await apiFetch('/productos/' + id, { method: 'DELETE' });
         await this.cargar();
       }
     };

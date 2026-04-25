@@ -18,7 +18,8 @@ def track_all_shipments(self):
 
 
 async def _track():
-    from app.database import AsyncSessionLocal
+    from app.database import make_celery_session
+    AsyncSessionLocal = make_celery_session()
     from app.models.order import Order, OrderStatus, ShipmentEvent, ShipmentEventType
     from app.models.tenant import TenantConfig
     from app.models.customer import Customer

@@ -14,5 +14,5 @@ build/
 media/
 celerybeat-schedule
 celerybeat.pid
-alembic/versions/*.py
-!alembic/versions/.gitkeep
+# Las migraciones de Alembic SÍ deben versionarse
+

@@ -6,14 +6,14 @@ from fastapi.responses import RedirectResponse
 from contextlib import asynccontextmanager
 
 from app.database import engine, Base
-from app.api import auth, tenants, products, campaigns, bot, orders, dashboard, admin
+from app.api import auth, tenants, products, campaigns, bot, orders, dashboard, admin, customers, billing
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Crear tablas si no existen (en producción usa Alembic)
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    # Aplicar migraciones (o crear esquema si la BD está vacía)
+    from app.db_init import init_database
+    await init_database()
     await _seed_superadmin()
     yield
 
@@ -70,6 +70,8 @@ app.include_router(bot.router)
 app.include_router(orders.router)
 app.include_router(dashboard.router)
 app.include_router(admin.router)
+app.include_router(customers.router)
+app.include_router(billing.router)
 
 
 @app.get("/")

@@ -17,3 +17,10 @@ class OrderOut(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class OrderUpdateStatus(BaseModel):
+    estado: OrderStatus
+    numero_seguimiento: str | None = None
+    transportadora: str | None = None
+    notificar_cliente: bool = True

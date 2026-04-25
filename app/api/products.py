@@ -6,10 +6,12 @@ from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload
 from app.database import get_db
 from app.core.deps import get_current_tenant
 from app.models.tenant import Tenant
 from app.models.product import Product
+from app.models.product import ProductContent
 from app.schemas.product import ProductCreate, ProductUpdate, ProductOut, ProductDetailOut, ProductListOut
 
 MEDIA_ROOT = "/app/media"
@@ -51,11 +53,19 @@ async def listar_productos(
     result = await db.execute(
         select(Product)
         .where(Product.tenant_id == tenant.id, Product.activo == True)
+        .options(selectinload(Product.contenido))
         .order_by(Product.created_at.desc())
         .offset(skip).limit(limit)
     )
     items = result.scalars().all()
-    return ProductListOut(total=total, items=list(items))
+
+    # Serializar con pipeline_paso incluido
+    items_out = []
+    for p in items:
+        d = ProductOut.model_validate(p).model_dump()
+        d["pipeline_paso"] = p.contenido.pipeline_paso if p.contenido else 0
+        items_out.append(d)
+    return {"total": total, "items": items_out}
 
 
 @router.post("/", response_model=ProductOut, status_code=201)
@@ -64,6 +74,9 @@ async def crear_producto(
     tenant: Tenant = Depends(get_current_tenant),
     db: AsyncSession = Depends(get_db),
 ):
+    from app.services.plan_limits import verificar_puede_crear_producto
+    await verificar_puede_crear_producto(tenant, db)
+
     producto = Product(tenant_id=tenant.id, **data.model_dump())
     db.add(producto)
     await db.commit()
@@ -89,9 +102,7 @@ async def subir_imagenes(
     if len(imagenes) > 10:
         raise HTTPException(status_code=400, detail="Máximo 10 imágenes por producto")
 
-    directorio = os.path.join(MEDIA_ROOT, "productos", str(tenant.id), str(product_id))
-    os.makedirs(directorio, exist_ok=True)
-
+    from app.services.storage import storage
     urls_guardadas = list(producto.imagenes_originales or [])
 
     for img in imagenes:
@@ -105,14 +116,9 @@ async def subir_imagenes(
 
         ext = mimetypes.guess_extension(mime) or ".jpg"
         nombre_archivo = f"{uuid.uuid4().hex}{ext}"
-        ruta = os.path.join(directorio, nombre_archivo)
-
-        async with aiofiles.open(ruta, "wb") as f:
-            await f.write(contenido)
-
-        # URL pública relativa (el worker la resuelve como ruta de disco)
-        url_relativa = f"/media/productos/{tenant.id}/{product_id}/{nombre_archivo}"
-        urls_guardadas.append(url_relativa)
+        key = f"productos/{tenant.id}/{product_id}/{nombre_archivo}"
+        url = await storage.guardar_bytes(key, contenido, mime)
+        urls_guardadas.append(url)
 
     producto.imagenes_originales = urls_guardadas
     await db.commit()

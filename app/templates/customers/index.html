@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+{% block title %}Clientes{% endblock %}
+{% block page_title %}Clientes{% endblock %}
+
+{% block topbar_actions %}
+<button @click="$dispatch('abrir-modal-cliente')"
+        class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition-colors">
+  + Nuevo cliente
+</button>
+{% endblock %}
+
+{% block content %}
+<div x-data="clientes()" x-init="cargar()" @abrir-modal-cliente.window="abrirModal()">
+
+  <!-- Buscador -->
+  <div class="flex items-center gap-3 mb-4">
+    <input type="text" x-model="filtroBusqueda" @input.debounce.400="cargar()"
+           placeholder="Buscar por nombre, email, teléfono o WhatsApp..."
+           class="flex-1 px-4 py-2.5 bg-gray-900 border border-gray-800 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 text-sm" />
+    <span class="text-sm text-gray-500" x-text="total + ' clientes'"></span>
+  </div>
+
+  <!-- Tabla -->
+  <div class="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+    <div x-show="cargando" class="py-12 text-center text-gray-500">Cargando...</div>
+    <div x-show="!cargando && items.length === 0" class="py-16 text-center">
+      <div class="text-4xl mb-3">👥</div>
+      <p class="text-gray-500" x-text="filtroBusqueda ? 'Sin resultados para tu búsqueda' : 'Aún no tienes clientes'"></p>
+      <p class="text-gray-600 text-sm mt-1" x-show="!filtroBusqueda">Los clientes se crean automáticamente al recibir mensajes en el bot, o puedes agregarlos manualmente.</p>
+    </div>
+
+    <table x-show="!cargando && items.length > 0" class="w-full">
+      <thead class="bg-gray-800/50">
+        <tr>
+          <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Cliente</th>
+          <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Contacto</th>
+          <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Ciudad</th>
+          <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Pedidos</th>
+          <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Total gastado</th>
+          <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Acciones</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-800">
+        <template x-for="c in items" :key="c.id">
+          <tr class="hover:bg-gray-800/30">
+            <td class="px-6 py-4">
+              <p class="font-medium text-white text-sm" x-text="c.nombre || '(sin nombre)'"></p>
+              <p class="text-xs text-gray-500 font-mono" x-text="c.id.substring(0, 8) + '...'"></p>
+            </td>
+            <td class="px-6 py-4 text-sm">
+              <p x-show="c.email" class="text-gray-300" x-text="c.email"></p>
+              <p x-show="c.telefono" class="text-gray-400 text-xs" x-text="'📞 ' + c.telefono"></p>
+              <p x-show="c.whatsapp_id" class="text-green-400 text-xs" x-text="'WhatsApp: ' + c.whatsapp_id"></p>
+              <p x-show="!c.email && !c.telefono && !c.whatsapp_id" class="text-gray-600">—</p>
+            </td>
+            <td class="px-6 py-4 text-gray-300 text-sm">
+              <span x-text="c.ciudad || '—'"></span>
+              <span x-show="c.departamento" class="text-gray-500" x-text="', ' + c.departamento"></span>
+            </td>
+            <td class="px-6 py-4 text-white" x-text="c.total_pedidos"></td>
+            <td class="px-6 py-4 text-white font-medium" x-text="'$' + c.total_gastado.toLocaleString('es-CO')"></td>
+            <td class="px-6 py-4">
+              <div class="flex items-center gap-3">
+                <button @click="editar(c)" class="text-indigo-400 hover:text-indigo-300 text-sm">Editar</button>
+                <button @click="eliminar(c.id)" class="text-red-400 hover:text-red-300 text-sm">Eliminar</button>
+              </div>
+            </td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Modal crear / editar cliente -->
+  <div x-show="modal" x-transition.opacity
+       class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+       @click.self="modal = false">
+    <div class="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-2xl shadow-2xl">
+      <div class="flex items-center justify-between mb-6">
+        <h3 class="text-lg font-semibold text-white" x-text="form.id ? 'Editar cliente' : 'Nuevo cliente'"></h3>
+        <button @click="modal = false" class="text-gray-500 hover:text-white text-xl leading-none">&times;</button>
+      </div>
+
+      <div class="grid grid-cols-2 gap-4">
+        <div class="col-span-2">
+          <label class="block text-sm text-gray-400 mb-1">Nombre completo</label>
+          <input type="text" x-model="form.nombre"
+                 class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500" />
+        </div>
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Email</label>
+          <input type="email" x-model="form.email"
+                 class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500" />
+        </div>
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Teléfono</label>
+          <input type="text" x-model="form.telefono"
+                 class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+                 placeholder="+57 300 123 4567" />
+        </div>
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">WhatsApp ID</label>
+          <input type="text" x-model="form.whatsapp_id"
+                 class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+                 placeholder="573001234567" />
+        </div>
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">País</label>
+          <select x-model="form.pais"
+                  class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-indigo-500">
+            <option value="CO">Colombia</option>
+            <option value="MX">México</option>
+            <option value="EC">Ecuador</option>
+            <option value="PE">Perú</option>
+            <option value="CL">Chile</option>
+            <option value="AR">Argentina</option>
+            <option value="ES">España</option>
+            <option value="US">Estados Unidos</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Ciudad</label>
+          <input type="text" x-model="form.ciudad"
+                 class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500" />
+        </div>
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Departamento / Estado</label>
+          <input type="text" x-model="form.departamento"
+                 class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500" />
+        </div>
+        <div class="col-span-2">
+          <label class="block text-sm text-gray-400 mb-1">Dirección</label>
+          <textarea x-model="form.direccion" rows="2"
+                    class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 resize-none"></textarea>
+        </div>
+      </div>
+
+      <div x-show="errorMsg" class="mt-4 px-4 py-3 bg-red-900/50 text-red-300 border border-red-800 rounded-lg text-sm" x-text="errorMsg"></div>
+
+      <div class="flex gap-3 mt-6">
+        <button @click="guardar()" :disabled="guardando"
+                class="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl transition-colors disabled:opacity-50"
+                x-text="guardando ? 'Guardando...' : (form.id ? 'Guardar cambios' : 'Crear cliente')"></button>
+        <button @click="modal = false"
+                class="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl transition-colors">
+          Cancelar
+        </button>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  requireAuth();
+
+  function clientes() {
+    return {
+      items: [], total: 0,
+      cargando: true, guardando: false,
+      modal: false, errorMsg: '',
+      filtroBusqueda: '',
+      form: { id: null, nombre: '', email: '', telefono: '', whatsapp_id: '', direccion: '', ciudad: '', departamento: '', pais: 'CO' },
+
+      async cargar() {
+        this.cargando = true;
+        const url = '/clientes/' + (this.filtroBusqueda ? '?q=' + encodeURIComponent(this.filtroBusqueda) : '');
+        const resp = await apiFetch(url);
+        if (resp && resp.ok) {
+          const data = await resp.json();
+          this.items = data.items;
+          this.total = data.total;
+        }
+        this.cargando = false;
+      },
+
+      abrirModal() {
+        this.errorMsg = '';
+        this.form = { id: null, nombre: '', email: '', telefono: '', whatsapp_id: '', direccion: '', ciudad: '', departamento: '', pais: 'CO' };
+        this.modal = true;
+      },
+
+      editar(c) {
+        this.errorMsg = '';
+        this.form = {
+          id: c.id, nombre: c.nombre || '', email: c.email || '', telefono: c.telefono || '',
+          whatsapp_id: c.whatsapp_id || '', direccion: c.direccion || '',
+          ciudad: c.ciudad || '', departamento: c.departamento || '', pais: c.pais || 'CO',
+        };
+        this.modal = true;
+      },
+
+      async guardar() {
+        this.guardando = true; this.errorMsg = '';
+        const body = { ...this.form };
+        if (!body.email) delete body.email;
+        const id = body.id;
+        delete body.id;
+
+        const url = id ? '/clientes/' + id : '/clientes/';
+        const method = id ? 'PATCH' : 'POST';
+        const resp = await apiFetch(url, { method, body: JSON.stringify(body) });
+
+        if (resp && resp.ok) {
+          this.modal = false;
+          await this.cargar();
+        } else if (resp) {
+          const err = await resp.json().catch(() => ({}));
+          const detail = err.detail;
+          this.errorMsg = Array.isArray(detail) ? detail.map(e => e.msg).join('; ') : (detail || 'Error al guardar');
+        }
+        this.guardando = false;
+      },
+
+      async eliminar(id) {
+        if (!confirm('¿Eliminar este cliente? Sus pedidos quedarán huérfanos.')) return;
+        await apiFetch('/clientes/' + id, { method: 'DELETE' });
+        await this.cargar();
+      },
+    };
+  }
+</script>
+{% endblock %}
