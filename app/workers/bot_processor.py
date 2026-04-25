@@ -48,16 +48,28 @@ async def _procesar_messenger(tenant_id: str, payload: dict):
 
 async def _responder_bot(tenant_id: str, external_user_id: str, texto: str, canal: str):
     import uuid
-    from app.database import AsyncSessionLocal
-    from app.models.tenant import TenantConfig
+    from app.database import make_celery_session
+    AsyncSessionLocal = make_celery_session()
+    from app.models.tenant import Tenant, TenantConfig
     from app.models.customer import Customer
     from app.models.bot import Conversation, Message, MessageRole, ConversationStatus, Canal
     from app.services.ai_content import generar_respuesta_bot
     from app.services.whatsapp import WhatsAppService
+    from app.services.plan_limits import verificar_puede_enviar_mensaje_bot
     from app.core.security import decrypt_secret
     from sqlalchemy import select
 
     async with AsyncSessionLocal() as db:
+        # Verificar tenant + límites de plan
+        tenant_result = await db.execute(select(Tenant).where(Tenant.id == uuid.UUID(tenant_id)))
+        tenant = tenant_result.scalar_one_or_none()
+        if not tenant or not tenant.activo:
+            return
+        try:
+            await verificar_puede_enviar_mensaje_bot(tenant, db)
+        except Exception:
+            return  # Excedió límite — silencioso para no bombardear al cliente con errores
+
         config_result = await db.execute(
             select(TenantConfig).where(TenantConfig.tenant_id == uuid.UUID(tenant_id))
         )

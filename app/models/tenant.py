@@ -103,6 +103,7 @@ class TenantConfig(Base):
     openai_api_key_enc: Mapped[str | None] = mapped_column(Text, nullable=True)
     heygen_api_key_enc: Mapped[str | None] = mapped_column(Text, nullable=True)
     kling_api_key_enc: Mapped[str | None] = mapped_column(Text, nullable=True)
+    higgsfield_api_key_enc: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

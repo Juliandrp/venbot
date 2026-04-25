@@ -1,88 +1,171 @@
 {% extends "base.html" %}
 {% block title %}Panel Admin{% endblock %}
-{% block page_title %}🛡️ Panel de Administración{% endblock %}
+{% block page_title %}Panel de Administración{% endblock %}
+
+{% block topbar_actions %}
+<a href="/admin/planes-vista"
+   class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium rounded-lg transition-colors">
+  Gestionar planes
+</a>
+{% endblock %}
 
 {% block content %}
 <div x-data="adminPanel()" x-init="cargar()">
 
   <!-- Métricas globales -->
-  <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-      <p class="text-sm text-gray-500">Total tenants</p>
-      <p class="text-3xl font-bold text-white mt-1" x-text="metricas.total_tenants || 0"></p>
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+      <p class="text-xs text-gray-500 uppercase tracking-wide">Tenants</p>
+      <p class="text-2xl font-bold text-white mt-1" x-text="metricas.total_tenants || 0"></p>
+      <p class="text-xs mt-1">
+        <span class="text-green-400" x-text="(metricas.tenants_activos || 0) + ' activos'"></span>
+        <span class="text-gray-600"> · </span>
+        <span class="text-red-400" x-text="(metricas.tenants_suspendidos || 0) + ' suspendidos'"></span>
+      </p>
     </div>
-    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-      <p class="text-sm text-gray-500">Tenants activos</p>
-      <p class="text-3xl font-bold text-green-400 mt-1" x-text="metricas.tenants_activos || 0"></p>
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+      <p class="text-xs text-gray-500 uppercase tracking-wide">Productos creados</p>
+      <p class="text-2xl font-bold text-white mt-1" x-text="metricas.total_productos || 0"></p>
+    </div>
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+      <p class="text-xs text-gray-500 uppercase tracking-wide">Pedidos totales</p>
+      <p class="text-2xl font-bold text-white mt-1" x-text="metricas.total_pedidos || 0"></p>
+    </div>
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+      <p class="text-xs text-gray-500 uppercase tracking-wide">Revenue plataforma</p>
+      <p class="text-2xl font-bold text-green-400 mt-1" x-text="'$' + (metricas.revenue_global || 0).toLocaleString('es-CO')"></p>
+    </div>
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+      <p class="text-xs text-gray-500 uppercase tracking-wide">Conversaciones bot</p>
+      <p class="text-2xl font-bold text-white mt-1" x-text="metricas.total_conversaciones || 0"></p>
+    </div>
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+      <p class="text-xs text-gray-500 uppercase tracking-wide">Mensajes intercambiados</p>
+      <p class="text-2xl font-bold text-white mt-1" x-text="metricas.total_mensajes || 0"></p>
     </div>
   </div>
 
   <!-- Tabla tenants -->
   <div class="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-    <div class="px-6 py-4 border-b border-gray-800">
-      <h2 class="font-semibold text-white">Todos los tenants</h2>
+    <div class="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
+      <h2 class="font-semibold text-white">Tenants <span class="text-gray-500 font-normal text-sm" x-text="'(' + tenants.length + ')'"></span></h2>
     </div>
-    <table class="w-full">
-      <thead class="bg-gray-800/50">
-        <tr>
-          <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Empresa</th>
-          <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Email</th>
-          <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Plan</th>
-          <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Estado</th>
-          <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Acciones</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-gray-800">
-        <template x-for="t in tenants" :key="t.id">
-          <tr class="hover:bg-gray-800/30">
-            <td class="px-6 py-4 font-medium text-white" x-text="t.nombre_empresa"></td>
-            <td class="px-6 py-4 text-gray-400 text-sm" x-text="t.email"></td>
-            <td class="px-6 py-4 text-gray-400 text-sm" x-text="t.estado_suscripcion"></td>
-            <td class="px-6 py-4">
-              <span :class="t.activo ? 'text-green-400' : 'text-red-400'" x-text="t.activo ? 'Activo' : 'Inactivo'"></span>
-            </td>
-            <td class="px-6 py-4 flex gap-2">
-              <button @click="suspender(t.id)"
-                      class="px-3 py-1 bg-red-800 hover:bg-red-700 text-red-200 text-xs rounded-lg">
-                Suspender
-              </button>
-              <button @click="activar(t.id)"
-                      class="px-3 py-1 bg-green-800 hover:bg-green-700 text-green-200 text-xs rounded-lg">
-                Activar
-              </button>
-            </td>
+    <div x-show="cargando" class="py-12 text-center text-gray-500">Cargando...</div>
+    <div class="overflow-x-auto">
+      <table x-show="!cargando" class="w-full">
+        <thead class="bg-gray-800/50">
+          <tr>
+            <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Empresa</th>
+            <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Email</th>
+            <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Plan</th>
+            <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Estado</th>
+            <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Productos</th>
+            <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Pedidos</th>
+            <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Revenue</th>
+            <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Acciones</th>
           </tr>
-        </template>
-      </tbody>
-    </table>
+        </thead>
+        <tbody class="divide-y divide-gray-800">
+          <template x-for="t in tenants" :key="t.id">
+            <tr class="hover:bg-gray-800/30">
+              <td class="px-6 py-4">
+                <p class="font-medium text-white text-sm" x-text="t.nombre_empresa"></p>
+                <p class="text-xs text-gray-500 font-mono" x-text="t.id.substring(0,8)"></p>
+              </td>
+              <td class="px-6 py-4 text-gray-400 text-sm" x-text="t.email"></td>
+              <td class="px-6 py-4">
+                <select :value="t.plan_id || ''" @change="cambiarPlan(t.id, $event.target.value)"
+                        class="bg-gray-800 border border-gray-700 rounded text-xs text-gray-300 px-2 py-1 focus:outline-none focus:border-indigo-500">
+                  <option value="">Sin plan</option>
+                  <template x-for="p in planes" :key="p.id">
+                    <option :value="p.id" x-text="p.nombre + ' ($' + p.precio_mensual_usd + ')'"></option>
+                  </template>
+                </select>
+              </td>
+              <td class="px-6 py-4">
+                <span :class="{
+                  'bg-green-900/50 text-green-400 border-green-800': t.estado_suscripcion === 'active' && t.activo,
+                  'bg-yellow-900/50 text-yellow-400 border-yellow-800': t.estado_suscripcion === 'trial',
+                  'bg-red-900/50 text-red-400 border-red-800': t.estado_suscripcion === 'suspended' || !t.activo,
+                  'bg-gray-800 text-gray-400 border-gray-700': t.estado_suscripcion === 'cancelled',
+                }" class="px-2 py-1 rounded-full text-xs border" x-text="t.activo ? t.estado_suscripcion : 'inactivo'"></span>
+              </td>
+              <td class="px-6 py-4 text-gray-300 text-sm" x-text="t.total_productos"></td>
+              <td class="px-6 py-4 text-gray-300 text-sm" x-text="t.total_pedidos"></td>
+              <td class="px-6 py-4 text-white font-medium text-sm" x-text="'$' + t.revenue_total.toLocaleString('es-CO')"></td>
+              <td class="px-6 py-4 flex gap-2">
+                <button x-show="t.activo" @click="suspender(t.id)"
+                        class="px-3 py-1 bg-red-800/60 hover:bg-red-700 text-red-200 text-xs rounded-lg">
+                  Suspender
+                </button>
+                <button x-show="!t.activo" @click="activar(t.id)"
+                        class="px-3 py-1 bg-green-800/60 hover:bg-green-700 text-green-200 text-xs rounded-lg">
+                  Activar
+                </button>
+                <button @click="eliminar(t.id, t.nombre_empresa)"
+                        class="px-3 py-1 bg-gray-800 hover:bg-red-800 text-gray-400 hover:text-white text-xs rounded-lg">
+                  ✕
+                </button>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+    <div x-show="!cargando && tenants.length === 0" class="py-12 text-center text-gray-500">
+      No hay tenants registrados aún.
+    </div>
   </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-  const token = localStorage.getItem('access_token');
-  if (!token) window.location.href = '/auth/iniciar-sesion';
+  requireAuth();
 
   function adminPanel() {
     return {
-      tenants: [], metricas: {},
+      tenants: [], planes: [], metricas: {}, cargando: true,
+
       async cargar() {
-        const headers = { Authorization: 'Bearer ' + token };
-        const [tResp, mResp] = await Promise.all([
-          fetch('/admin/tenants', { headers }),
-          fetch('/admin/metricas', { headers }),
+        this.cargando = true;
+        const [tResp, mResp, pResp] = await Promise.all([
+          apiFetch('/admin/tenants'),
+          apiFetch('/admin/metricas'),
+          apiFetch('/admin/planes'),
         ]);
-        if (tResp.status === 403) { window.location.href = '/dashboard/'; return; }
-        this.tenants = await tResp.json();
-        this.metricas = await mResp.json();
+        if (tResp && tResp.status === 403) { window.location.href = '/dashboard/'; return; }
+        if (tResp && tResp.ok) {
+          const data = await tResp.json();
+          this.tenants = data.items;
+        }
+        if (mResp && mResp.ok) this.metricas = await mResp.json();
+        if (pResp && pResp.ok) this.planes = await pResp.json();
+        this.cargando = false;
       },
+
       async suspender(id) {
-        await fetch('/admin/tenants/' + id + '/suspender', { method: 'POST', headers: { Authorization: 'Bearer ' + token } });
+        if (!confirm('¿Suspender este tenant? Perderá acceso al instante.')) return;
+        await apiFetch('/admin/tenants/' + id + '/suspender', { method: 'POST' });
         await this.cargar();
       },
+
       async activar(id) {
-        await fetch('/admin/tenants/' + id + '/activar', { method: 'POST', headers: { Authorization: 'Bearer ' + token } });
+        await apiFetch('/admin/tenants/' + id + '/activar', { method: 'POST' });
+        await this.cargar();
+      },
+
+      async cambiarPlan(tenantId, planId) {
+        await apiFetch('/admin/tenants/' + tenantId + '/asignar-plan', {
+          method: 'POST',
+          body: JSON.stringify({ plan_id: planId ? parseInt(planId) : null }),
+        });
+        await this.cargar();
+      },
+
+      async eliminar(id, nombre) {
+        if (!confirm('Eliminar tenant "' + nombre + '" y TODOS sus datos? Esta acción no se puede deshacer.')) return;
+        await apiFetch('/admin/tenants/' + id, { method: 'DELETE' });
         await this.cargar();
       },
     };

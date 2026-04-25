@@ -10,6 +10,7 @@ class TenantOut(BaseModel):
     email: EmailStr
     estado_suscripcion: PlanStatus
     activo: bool
+    es_superadmin: bool = False
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -56,6 +57,7 @@ class TenantConfigIn(BaseModel):
     openai_api_key: str | None = None
     kling_api_key: str | None = None
     heygen_api_key: str | None = None
+    higgsfield_api_key: str | None = None
 
 
 class TenantConfigOut(BaseModel):
@@ -83,6 +85,7 @@ class TenantConfigOut(BaseModel):
     tiene_openai_key: bool = False
     tiene_kling_key: bool = False
     tiene_heygen_key: bool = False
+    tiene_higgsfield_key: bool = False
 
     updated_at: datetime | None = None
 

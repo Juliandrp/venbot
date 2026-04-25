@@ -1,14 +1,21 @@
 {% extends "base.html" %}
 {% block title %}Campañas{% endblock %}
-{% block page_title %}📣 Campañas Meta Ads{% endblock %}
+{% block page_title %}Campañas Meta Ads{% endblock %}
+
+{% block topbar_actions %}
+<button @click="$dispatch('abrir-modal-campana')"
+        class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition-colors">
+  + Nueva campaña
+</button>
+{% endblock %}
 
 {% block content %}
-<div x-data="campanas()" x-init="cargar()">
+<div x-data="campanas()" x-init="cargar()" @abrir-modal-campana.window="abrirModal()">
 
-  <!-- KPIs campañas -->
+  <!-- KPIs -->
   <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
     <div class="bg-gray-900 border border-gray-800 rounded-2xl p-5 text-center">
-      <p class="text-sm text-gray-500">Total campañas</p>
+      <p class="text-sm text-gray-500">Total</p>
       <p class="text-2xl font-bold text-white mt-1" x-text="items.length"></p>
     </div>
     <div class="bg-gray-900 border border-gray-800 rounded-2xl p-5 text-center">
@@ -20,87 +27,197 @@
       <p class="text-2xl font-bold text-yellow-400 mt-1" x-text="items.filter(c => c.estado === 'pausada').length"></p>
     </div>
     <div class="bg-gray-900 border border-gray-800 rounded-2xl p-5 text-center">
-      <p class="text-sm text-gray-500">En borrador</p>
+      <p class="text-sm text-gray-500">Borrador</p>
       <p class="text-2xl font-bold text-gray-400 mt-1" x-text="items.filter(c => c.estado === 'borrador').length"></p>
     </div>
   </div>
 
-  <!-- Tabla campañas -->
+  <!-- Tabla -->
   <div class="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-    <div class="px-6 py-4 border-b border-gray-800">
-      <h2 class="font-semibold text-white">Todas las campañas</h2>
+    <div class="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
+      <h2 class="font-semibold text-white">Campañas</h2>
     </div>
 
-    <div x-show="cargando" class="py-12 text-center text-gray-500">Cargando campañas...</div>
-    <div x-show="!cargando && items.length === 0" class="py-12 text-center text-gray-500">
-      No hay campañas. Crea un producto primero y luego lanza una campaña.
+    <div x-show="cargando" class="py-12 text-center text-gray-500">Cargando...</div>
+    <div x-show="!cargando && items.length === 0" class="py-16 text-center">
+      <div class="text-4xl mb-3">📣</div>
+      <p class="text-gray-500 mb-1">Aún no tienes campañas</p>
+      <p class="text-gray-600 text-sm">Crea un producto primero, luego lanza tu primera campaña en Meta Ads.</p>
     </div>
 
-    <table x-show="!cargando && items.length > 0" class="w-full">
-      <thead class="bg-gray-800/50">
-        <tr>
-          <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Campaña</th>
-          <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Estado</th>
-          <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Presupuesto / día</th>
-          <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">ID Meta</th>
-          <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Acciones</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-gray-800">
-        <template x-for="c in items" :key="c.id">
-          <tr class="hover:bg-gray-800/30">
-            <td class="px-6 py-4 font-medium text-white" x-text="c.nombre"></td>
-            <td class="px-6 py-4">
-              <span :class="{
-                'bg-green-900/50 text-green-400 border-green-800': c.estado === 'activa',
-                'bg-yellow-900/50 text-yellow-400 border-yellow-800': c.estado === 'pausada',
-                'bg-gray-800 text-gray-400 border-gray-700': c.estado === 'borrador',
-                'bg-red-900/50 text-red-400 border-red-800': c.estado === 'error',
-              }" class="px-2 py-1 rounded-full text-xs border" x-text="c.estado"></span>
-            </td>
-            <td class="px-6 py-4 text-gray-300" x-text="'$' + c.presupuesto_diario + ' USD'"></td>
-            <td class="px-6 py-4 text-gray-500 font-mono text-xs" x-text="c.meta_campaign_id || '—'"></td>
-            <td class="px-6 py-4 flex gap-2">
-              <button x-show="c.estado === 'borrador'"
-                      @click="lanzar(c.id)"
-                      class="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white text-xs rounded-lg transition-colors">
-                🚀 Lanzar
-              </button>
-              <button x-show="c.estado === 'activa'"
-                      @click="pausar(c.id)"
-                      class="px-3 py-1 bg-yellow-600 hover:bg-yellow-500 text-white text-xs rounded-lg transition-colors">
-                ⏸ Pausar
-              </button>
-            </td>
+    <div x-show="!cargando && items.length > 0" class="overflow-x-auto">
+      <table class="w-full">
+        <thead class="bg-gray-800/50">
+          <tr>
+            <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Campaña</th>
+            <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Estado</th>
+            <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Presupuesto / día</th>
+            <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">ROAS mín.</th>
+            <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">ID Meta</th>
+            <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Acciones</th>
           </tr>
-        </template>
-      </tbody>
-    </table>
+        </thead>
+        <tbody class="divide-y divide-gray-800">
+          <template x-for="c in items" :key="c.id">
+            <tr class="hover:bg-gray-800/30">
+              <td class="px-6 py-4 font-medium text-white" x-text="c.nombre"></td>
+              <td class="px-6 py-4">
+                <span :class="{
+                  'bg-green-900/50 text-green-400 border-green-800': c.estado === 'activa',
+                  'bg-yellow-900/50 text-yellow-400 border-yellow-800': c.estado === 'pausada',
+                  'bg-gray-800 text-gray-400 border-gray-700': c.estado === 'borrador',
+                  'bg-red-900/50 text-red-400 border-red-800': c.estado === 'error',
+                }" class="px-2 py-1 rounded-full text-xs border" x-text="c.estado"></span>
+              </td>
+              <td class="px-6 py-4 text-gray-300" x-text="'$' + c.presupuesto_diario + ' USD'"></td>
+              <td class="px-6 py-4 text-gray-300" x-text="c.roas_minimo ? c.roas_minimo + 'x' : '—'"></td>
+              <td class="px-6 py-4 text-gray-500 font-mono text-xs" x-text="c.meta_campaign_id || '—'"></td>
+              <td class="px-6 py-4 flex gap-2">
+                <button x-show="c.estado === 'borrador'"
+                        @click="lanzar(c.id)"
+                        class="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white text-xs rounded-lg transition-colors">
+                  Lanzar
+                </button>
+                <button x-show="c.estado === 'activa'"
+                        @click="pausar(c.id)"
+                        class="px-3 py-1 bg-yellow-600 hover:bg-yellow-500 text-white text-xs rounded-lg transition-colors">
+                  Pausar
+                </button>
+                <button x-show="c.estado === 'pausada'"
+                        @click="lanzar(c.id)"
+                        class="px-3 py-1 bg-green-700 hover:bg-green-600 text-white text-xs rounded-lg transition-colors">
+                  Reactivar
+                </button>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
   </div>
+
+  <!-- ── Modal nueva campaña ─────────────────────────────────── -->
+  <div x-show="modal" x-transition.opacity
+       class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+       @click.self="modal = false">
+    <div class="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-lg shadow-2xl">
+      <div class="flex items-center justify-between mb-6">
+        <h3 class="text-lg font-semibold text-white">Nueva campaña Meta Ads</h3>
+        <button @click="modal = false" class="text-gray-500 hover:text-white text-xl leading-none">&times;</button>
+      </div>
+
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Nombre de la campaña</label>
+          <input type="text" x-model="form.nombre"
+                 class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+                 placeholder="Ej: Campaña verano 2026" />
+        </div>
+
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Producto a promocionar</label>
+          <select x-model="form.product_id"
+                  class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-indigo-500">
+            <option value="">— Selecciona un producto —</option>
+            <template x-for="p in productos" :key="p.id">
+              <option :value="p.id" x-text="p.nombre"></option>
+            </template>
+          </select>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Presupuesto diario (USD)</label>
+            <input type="number" x-model="form.presupuesto_diario" min="1" step="0.5"
+                   class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-indigo-500"
+                   placeholder="10" />
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">ROAS mínimo</label>
+            <input type="number" x-model="form.roas_minimo" min="0" step="0.1"
+                   class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-indigo-500"
+                   placeholder="2.5" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Fecha inicio</label>
+            <input type="date" x-model="form.fecha_inicio"
+                   class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-indigo-500" />
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Fecha fin (opcional)</label>
+            <input type="date" x-model="form.fecha_fin"
+                   class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-indigo-500" />
+          </div>
+        </div>
+
+        <div x-show="errorMsg" class="text-red-400 text-sm" x-text="errorMsg"></div>
+
+        <div class="flex gap-3 pt-2">
+          <button @click="crear()" :disabled="guardando"
+                  class="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl transition-colors disabled:opacity-50"
+                  x-text="guardando ? 'Creando...' : 'Crear campaña'"></button>
+          <button @click="modal = false"
+                  class="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl transition-colors">
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-  const token = localStorage.getItem('access_token');
-  if (!token) window.location.href = '/auth/iniciar-sesion';
+  requireAuth();
 
   function campanas() {
     return {
-      items: [], cargando: true,
+      items: [], productos: [], cargando: true,
+      modal: false, guardando: false, errorMsg: '',
+      form: { nombre: '', product_id: '', presupuesto_diario: 10, roas_minimo: 2.5, fecha_inicio: '', fecha_fin: '' },
+
       async cargar() {
-        try {
-          const resp = await fetch('/campanas/', { headers: { Authorization: 'Bearer ' + token } });
-          if (resp.status === 401) { window.location.href = '/auth/iniciar-sesion'; return; }
-          this.items = await resp.json();
-        } finally { this.cargando = false; }
+        const resp = await apiFetch('/campanas/');
+        if (resp && resp.ok) this.items = await resp.json();
+        this.cargando = false;
       },
+
+      async abrirModal() {
+        this.errorMsg = '';
+        this.form = { nombre: '', product_id: '', presupuesto_diario: 10, roas_minimo: 2.5, fecha_inicio: '', fecha_fin: '' };
+        if (!this.productos.length) {
+          const r = await apiFetch('/productos/');
+          if (r && r.ok) this.productos = await r.json();
+        }
+        this.modal = true;
+      },
+
+      async crear() {
+        if (!this.form.nombre || !this.form.presupuesto_diario) { this.errorMsg = 'Nombre y presupuesto son obligatorios'; return; }
+        this.guardando = true; this.errorMsg = '';
+        const resp = await apiFetch('/campanas/', { method: 'POST', body: JSON.stringify(this.form) });
+        if (resp && resp.ok) {
+          this.modal = false;
+          await this.cargar();
+        } else if (resp) {
+          const err = await resp.json().catch(() => ({}));
+          this.errorMsg = Array.isArray(err.detail) ? err.detail.map(e => e.msg).join('; ') : (err.detail || 'Error al crear');
+        }
+        this.guardando = false;
+      },
+
       async lanzar(id) {
-        await fetch('/campanas/' + id + '/lanzar', { method: 'POST', headers: { Authorization: 'Bearer ' + token } });
+        const resp = await apiFetch('/campanas/' + id + '/lanzar', { method: 'POST' });
         await this.cargar();
       },
+
       async pausar(id) {
-        await fetch('/campanas/' + id + '/pausar', { method: 'POST', headers: { Authorization: 'Bearer ' + token } });
+        const resp = await apiFetch('/campanas/' + id + '/pausar', { method: 'POST' });
         await this.cargar();
       },
     };

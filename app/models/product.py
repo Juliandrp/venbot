@@ -56,6 +56,9 @@ class ProductContent(Base):
     # Imágenes generadas por DALL-E / Flux
     imagenes_generadas: Mapped[list | None] = mapped_column(JSON, nullable=True)
 
+    # Progreso del pipeline (0=pendiente, 1=copy, 2=imágenes, 3=video, 4=publicado)
+    pipeline_paso: Mapped[int] = mapped_column(Integer, default=0)
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

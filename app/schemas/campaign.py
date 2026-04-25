@@ -6,7 +6,7 @@ from app.models.campaign import CampaignStatus
 
 class CampaignCreate(BaseModel):
     nombre: str
-    product_id: uuid.UUID
+    product_id: uuid.UUID | None = None
     presupuesto_diario: float = 10.0
     roas_minimo: float | None = None
     cpc_maximo: float | None = None
@@ -19,7 +19,8 @@ class CampaignOut(BaseModel):
     nombre: str
     estado: CampaignStatus
     presupuesto_diario: float
-    meta_campaign_id: str | None
+    roas_minimo: float | None = None
+    meta_campaign_id: str | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

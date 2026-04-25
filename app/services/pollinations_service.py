@@ -3,14 +3,13 @@ Generación de imágenes gratis con Pollinations.ai (modelo Flux).
 Sin API key, sin límite de peticiones, sin costo.
 https://pollinations.ai
 """
-import os
 import uuid
 import urllib.parse
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
+from app.services.storage import storage
 
 POLLINATIONS_URL = "https://image.pollinations.ai/prompt/{prompt}"
-MEDIA_ROOT = "/app/media"
 
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=3, max=15))
@@ -31,39 +30,35 @@ async def generar_imagenes_producto(
     cantidad: int = 3,
 ) -> list[str]:
     """
-    Genera imágenes publicitarias completamente gratis con Pollinations (Flux).
-    Guarda en disco y retorna URLs relativas /media/...
+    Genera imágenes publicitarias gratis con Pollinations (Flux).
+    Retorna lista de URLs públicas (depende del backend de storage configurado).
     """
     estilos = [
         (
             f"professional product photography of {nombre}, {descripcion}, "
             "white background, studio lighting, e-commerce style, no text, photorealistic 4K",
-            "1:1", 1024, 1024,
+            1024, 1024,
         ),
         (
             f"lifestyle photo of {nombre} in use, {descripcion}, "
             "modern Latin American home setting, natural daylight, no text, photorealistic",
-            "4:5", 1024, 1280,
+            1024, 1280,
         ),
         (
             f"advertising banner for {nombre}, {descripcion}, "
             "vibrant colors, product as hero shot, clean background, no text, commercial photography",
-            "16:9", 1280, 720,
+            1280, 720,
         ),
     ]
 
-    directorio = os.path.join(MEDIA_ROOT, "productos", tenant_id, product_id, "pollinations")
-    os.makedirs(directorio, exist_ok=True)
-
     urls: list[str] = []
-    for i, (prompt, _, ancho, alto) in enumerate(estilos[:cantidad]):
+    for i, (prompt, ancho, alto) in enumerate(estilos[:cantidad]):
         try:
             datos = await _descargar_imagen(prompt, ancho, alto)
             nombre_archivo = f"flux_{i}_{uuid.uuid4().hex[:8]}.jpg"
-            ruta = os.path.join(directorio, nombre_archivo)
-            with open(ruta, "wb") as f:
-                f.write(datos)
-            urls.append(f"/media/productos/{tenant_id}/{product_id}/pollinations/{nombre_archivo}")
+            key = f"productos/{tenant_id}/{product_id}/pollinations/{nombre_archivo}"
+            url = await storage.guardar_bytes(key, datos, "image/jpeg")
+            urls.append(url)
         except Exception:
             continue
 

@@ -29,6 +29,7 @@ class ProductContentOut(BaseModel):
     video_url: str | None = None
     video_estado: str | None = None
     imagenes_generadas: list[str] | None = None
+    pipeline_paso: int = 0
 
     model_config = {"from_attributes": True}
 

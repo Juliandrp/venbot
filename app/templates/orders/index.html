@@ -1,72 +1,181 @@
 {% extends "base.html" %}
 {% block title %}Pedidos{% endblock %}
-{% block page_title %}🛒 Pedidos{% endblock %}
+{% block page_title %}Pedidos{% endblock %}
 
 {% block content %}
 <div x-data="pedidos()" x-init="cargar()">
   <div class="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-    <div class="px-6 py-4 border-b border-gray-800">
+    <div class="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
       <span class="text-sm text-gray-400" x-text="items.length + ' pedidos'"></span>
     </div>
 
-    <div x-show="cargando" class="py-12 text-center text-gray-500">Cargando pedidos...</div>
-    <div x-show="!cargando && items.length === 0" class="py-12 text-center text-gray-500">
-      Aún no hay pedidos registrados.
+    <div x-show="cargando" class="py-12 text-center text-gray-500">Cargando...</div>
+    <div x-show="!cargando && items.length === 0" class="py-16 text-center">
+      <div class="text-4xl mb-3">🛒</div>
+      <p class="text-gray-500">Aún no hay pedidos</p>
+      <p class="text-gray-600 text-sm mt-1">Los pedidos se generan automáticamente cuando el bot cierra una venta.</p>
     </div>
 
-    <table x-show="!cargando && items.length > 0" class="w-full">
-      <thead class="bg-gray-800/50">
-        <tr>
-          <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">ID</th>
-          <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Destinatario</th>
-          <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Ciudad</th>
-          <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Total</th>
-          <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Estado</th>
-          <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Seguimiento</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-gray-800">
-        <template x-for="p in items" :key="p.id">
-          <tr class="hover:bg-gray-800/30">
-            <td class="px-6 py-4 font-mono text-xs text-gray-500" x-text="p.id.substring(0, 8)"></td>
-            <td class="px-6 py-4">
-              <p class="font-medium text-white text-sm" x-text="p.nombre_destinatario"></p>
-              <p class="text-xs text-gray-500" x-text="p.telefono_destinatario"></p>
-            </td>
-            <td class="px-6 py-4 text-gray-300 text-sm" x-text="p.ciudad_envio"></td>
-            <td class="px-6 py-4 text-white font-medium" x-text="'$' + parseFloat(p.total).toLocaleString('es-CO')"></td>
-            <td class="px-6 py-4">
-              <span :class="{
-                'bg-green-900/50 text-green-400 border-green-800': p.estado === 'entregado',
-                'bg-blue-900/50 text-blue-400 border-blue-800': p.estado === 'enviado' || p.estado === 'en_camino',
-                'bg-yellow-900/50 text-yellow-400 border-yellow-800': p.estado === 'confirmado',
-                'bg-gray-800 text-gray-400 border-gray-700': p.estado === 'pendiente',
-                'bg-red-900/50 text-red-400 border-red-800': p.estado === 'fallido' || p.estado === 'cancelado',
-              }" class="px-2 py-1 rounded-full text-xs border" x-text="p.estado"></span>
-            </td>
-            <td class="px-6 py-4 font-mono text-xs text-gray-500" x-text="p.numero_seguimiento || '—'"></td>
+    <div x-show="!cargando && items.length > 0" class="overflow-x-auto">
+      <table class="w-full">
+        <thead class="bg-gray-800/50">
+          <tr>
+            <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">ID</th>
+            <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Destinatario</th>
+            <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Ciudad</th>
+            <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Total</th>
+            <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Estado</th>
+            <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Seguimiento</th>
+            <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Acciones</th>
           </tr>
-        </template>
-      </tbody>
-    </table>
+        </thead>
+        <tbody class="divide-y divide-gray-800">
+          <template x-for="p in items" :key="p.id">
+            <tr class="hover:bg-gray-800/30">
+              <td class="px-6 py-4 font-mono text-xs text-gray-500" x-text="'#' + p.id.substring(0, 8).toUpperCase()"></td>
+              <td class="px-6 py-4">
+                <p class="font-medium text-white text-sm" x-text="p.nombre_destinatario"></p>
+                <p class="text-xs text-gray-500" x-text="p.telefono_destinatario"></p>
+              </td>
+              <td class="px-6 py-4 text-gray-300 text-sm" x-text="p.ciudad_envio"></td>
+              <td class="px-6 py-4 text-white font-medium" x-text="'$' + parseFloat(p.total).toLocaleString('es-CO')"></td>
+              <td class="px-6 py-4">
+                <span :class="{
+                  'bg-green-900/50 text-green-400 border-green-800': p.estado === 'entregado',
+                  'bg-blue-900/50 text-blue-400 border-blue-800': p.estado === 'enviado' || p.estado === 'en_camino',
+                  'bg-yellow-900/50 text-yellow-400 border-yellow-800': p.estado === 'confirmado',
+                  'bg-gray-800 text-gray-400 border-gray-700': p.estado === 'pendiente',
+                  'bg-red-900/50 text-red-400 border-red-800': p.estado === 'fallido' || p.estado === 'cancelado',
+                }" class="px-2 py-1 rounded-full text-xs border" x-text="p.estado"></span>
+              </td>
+              <td class="px-6 py-4 font-mono text-xs text-gray-500" x-text="p.numero_seguimiento || '—'"></td>
+              <td class="px-6 py-4">
+                <div class="flex items-center gap-3">
+                  <button @click="abrirEditor(p)" class="text-indigo-400 hover:text-indigo-300 text-sm">Cambiar estado</button>
+                  <button @click="reenviar(p.id)" class="text-gray-400 hover:text-gray-200 text-sm">Reenviar aviso</button>
+                </div>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Modal cambiar estado -->
+  <div x-show="modal" x-transition.opacity
+       class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+       @click.self="modal = false">
+    <div class="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-md shadow-2xl">
+      <div class="flex items-center justify-between mb-6">
+        <h3 class="text-lg font-semibold text-white">Cambiar estado del pedido</h3>
+        <button @click="modal = false" class="text-gray-500 hover:text-white text-xl leading-none">&times;</button>
+      </div>
+
+      <div x-show="pedidoEditar" class="space-y-4">
+        <p class="text-sm text-gray-400">
+          Pedido <span class="font-mono text-white" x-text="pedidoEditar?.id?.substring(0,8).toUpperCase()"></span>
+          de <span class="text-white" x-text="pedidoEditar?.nombre_destinatario"></span>
+        </p>
+
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Nuevo estado</label>
+          <select x-model="form.estado"
+                  class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-indigo-500">
+            <option value="pendiente">Pendiente</option>
+            <option value="confirmado">Confirmado</option>
+            <option value="enviado">Enviado</option>
+            <option value="en_camino">En camino</option>
+            <option value="entregado">Entregado</option>
+            <option value="fallido">Fallido</option>
+            <option value="cancelado">Cancelado</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Número de seguimiento (opcional)</label>
+          <input type="text" x-model="form.numero_seguimiento"
+                 class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-indigo-500"
+                 placeholder="Guía de rastreo" />
+        </div>
+
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Transportadora (opcional)</label>
+          <input type="text" x-model="form.transportadora"
+                 class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-indigo-500"
+                 placeholder="Servientrega, InterRapidísimo, etc." />
+        </div>
+
+        <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+          <input type="checkbox" x-model="form.notificar_cliente" class="w-4 h-4 rounded" />
+          Notificar al cliente por WhatsApp y email
+        </label>
+
+        <div x-show="errorMsg" class="text-red-400 text-sm" x-text="errorMsg"></div>
+
+        <div class="flex gap-3 pt-2">
+          <button @click="guardar()" :disabled="guardando"
+                  class="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl transition-colors disabled:opacity-50"
+                  x-text="guardando ? 'Guardando...' : 'Guardar y notificar'"></button>
+          <button @click="modal = false" class="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl">
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-  const token = localStorage.getItem('access_token');
-  if (!token) window.location.href = '/auth/iniciar-sesion';
+  requireAuth();
 
   function pedidos() {
     return {
       items: [], cargando: true,
+      modal: false, guardando: false, errorMsg: '',
+      pedidoEditar: null,
+      form: { estado: 'confirmado', numero_seguimiento: '', transportadora: '', notificar_cliente: true },
+
       async cargar() {
-        try {
-          const resp = await fetch('/pedidos/', { headers: { Authorization: 'Bearer ' + token } });
-          if (resp.status === 401) { window.location.href = '/auth/iniciar-sesion'; return; }
-          this.items = await resp.json();
-        } finally { this.cargando = false; }
+        const resp = await apiFetch('/pedidos/');
+        if (resp && resp.ok) this.items = await resp.json();
+        this.cargando = false;
+      },
+
+      abrirEditor(p) {
+        this.pedidoEditar = p;
+        this.form = {
+          estado: p.estado,
+          numero_seguimiento: p.numero_seguimiento || '',
+          transportadora: p.transportadora || '',
+          notificar_cliente: true,
+        };
+        this.errorMsg = '';
+        this.modal = true;
+      },
+
+      async guardar() {
+        this.guardando = true; this.errorMsg = '';
+        const resp = await apiFetch('/pedidos/' + this.pedidoEditar.id + '/estado', {
+          method: 'PATCH',
+          body: JSON.stringify(this.form),
+        });
+        if (resp && resp.ok) {
+          this.modal = false;
+          await this.cargar();
+        } else if (resp) {
+          const err = await resp.json().catch(() => ({}));
+          this.errorMsg = err.detail || 'Error al guardar';
+        }
+        this.guardando = false;
+      },
+
+      async reenviar(id) {
+        if (!confirm('¿Reenviar la notificación del estado actual al cliente?')) return;
+        const resp = await apiFetch('/pedidos/' + id + '/reenviar-notificacion', { method: 'POST' });
+        if (resp && resp.ok) alert('Notificación encolada');
       },
     };
   }

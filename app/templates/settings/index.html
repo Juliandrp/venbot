@@ -69,9 +69,11 @@
       <!-- IA para video -->
       <div>
         <label class="block text-sm font-medium text-gray-300 mb-2">IA para videos de producto</label>
-        <div class="grid grid-cols-2 gap-3 mb-3">
-          <template x-for="op in [{val:'kling', label:'Kling AI', sub:'Kuaishou · Recomendado', icon:'🎬'},
-                                   {val:'heygen', label:'HeyGen', sub:'Avatar + voz', icon:'🎤'}]">
+        <div class="grid grid-cols-3 gap-3 mb-3">
+          <template x-for="op in [
+            {val:'kling', label:'Kling AI', sub:'Kuaishou · Recomendado', icon:'🎬'},
+            {val:'higgsfield', label:'Higgsfield', sub:'Cámara cinemática', icon:'🎥'},
+            {val:'heygen', label:'HeyGen', sub:'Avatar + voz', icon:'🎤'}]">
             <button type="button"
                     @click="form.video_provider = op.val"
                     :class="form.video_provider === op.val
@@ -94,6 +96,16 @@
                  class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 text-sm"
                  :placeholder="cfg.tiene_kling_key ? '••••••••  (dejar vacío para no cambiar)' : 'tu-kling-api-key'" />
           <p class="text-xs text-gray-600 mt-1">Obtén tu key en <span class="text-indigo-400">klingai.com → API</span></p>
+        </div>
+        <div x-show="form.video_provider === 'higgsfield'">
+          <label class="block text-xs text-gray-500 mb-1">
+            API Key de Higgsfield
+            <span x-show="cfg.tiene_higgsfield_key" class="text-green-400 ml-1">✓ configurada</span>
+          </label>
+          <input type="password" x-model="form.higgsfield_api_key"
+                 class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 text-sm"
+                 :placeholder="cfg.tiene_higgsfield_key ? '••••••••  (dejar vacío para no cambiar)' : 'tu-higgsfield-api-key'" />
+          <p class="text-xs text-gray-600 mt-1">Obtén tu key en <span class="text-indigo-400">higgsfield.ai → API</span></p>
         </div>
         <div x-show="form.video_provider === 'heygen'">
           <label class="block text-xs text-gray-500 mb-1">
@@ -202,7 +214,49 @@
           <input type="text" x-model="form.waba_verify_token"
                  class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
                  placeholder="mi_token_secreto_123" />
-          <p class="text-xs text-gray-600 mt-1">URL webhook: <span class="font-mono text-indigo-400" x-text="location.origin + '/bot/whatsapp/webhook/TU-TENANT-ID'"></span></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Webhooks (URLs propias del tenant para configurar en Meta/WhatsApp) ── -->
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+      <h2 class="font-semibold text-white mb-1 flex items-center gap-2">
+        <span class="text-xl">🔌</span> URLs de Webhooks
+      </h2>
+      <p class="text-xs text-gray-500 mb-4">
+        Copia estas URLs y configúralas en el panel de desarrolladores de Meta para recibir mensajes y eventos en tiempo real.
+      </p>
+
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">WhatsApp Business webhook</label>
+          <div class="flex items-center gap-2">
+            <code class="flex-1 px-3 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-sm text-indigo-400 font-mono truncate" x-text="webhookUrl('whatsapp')"></code>
+            <button @click="copiar(webhookUrl('whatsapp'))" class="px-3 py-2.5 bg-gray-800 hover:bg-indigo-700 text-gray-300 hover:text-white text-sm rounded-xl transition-colors">
+              Copiar
+            </button>
+          </div>
+          <p class="text-xs text-gray-600 mt-1">Métodos: GET (verificación) y POST (mensajes entrantes)</p>
+        </div>
+
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Messenger webhook</label>
+          <div class="flex items-center gap-2">
+            <code class="flex-1 px-3 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-sm text-indigo-400 font-mono truncate" x-text="webhookUrl('messenger')"></code>
+            <button @click="copiar(webhookUrl('messenger'))" class="px-3 py-2.5 bg-gray-800 hover:bg-indigo-700 text-gray-300 hover:text-white text-sm rounded-xl transition-colors">
+              Copiar
+            </button>
+          </div>
+        </div>
+
+        <div class="bg-gray-800/60 border border-gray-700 rounded-xl p-4 text-xs text-gray-400">
+          <p class="font-medium text-gray-300 mb-2">Pasos para configurar en Meta:</p>
+          <ol class="list-decimal list-inside space-y-1">
+            <li>Ve a <span class="text-indigo-400">developers.facebook.com</span> → tu app → WhatsApp → Configuration</li>
+            <li>Pega la URL en "Callback URL" y el "Verify Token" que definiste arriba</li>
+            <li>Suscríbete a los eventos: <span class="font-mono text-gray-300">messages</span></li>
+            <li>Guarda y verifica que aparezca en verde "Active"</li>
+          </ol>
         </div>
       </div>
     </div>
@@ -286,15 +340,15 @@
 
 {% block scripts %}
 <script>
-  const token = localStorage.getItem('access_token');
-  if (!token) window.location.href = '/auth/iniciar-sesion';
+  requireAuth();
 
   function config() {
     return {
+      tenantId: '',
       form: {
         ai_provider: 'claude', video_provider: 'kling',
         anthropic_api_key: '', gemini_api_key: '', openai_api_key: '',
-        kling_api_key: '', heygen_api_key: '',
+        kling_api_key: '', heygen_api_key: '', higgsfield_api_key: '',
         shopify_store_url: '', shopify_access_token: '',
         meta_app_id: '', meta_app_secret: '', meta_access_token: '',
         meta_ad_account_id: '', meta_pixel_id: '',
@@ -306,13 +360,35 @@
       cfg: {
         tiene_anthropic_key: false, tiene_gemini_key: false,
         tiene_openai_key: false, tiene_kling_key: false, tiene_heygen_key: false,
+        tiene_higgsfield_key: false,
       },
       guardando: false, guardadoOk: false, errorMsg: '',
 
+      webhookUrl(canal) {
+        const tid = this.tenantId || 'TU-TENANT-ID';
+        return `${location.origin}/bot/${canal}/webhook/${tid}`;
+      },
+
+      async copiar(texto) {
+        try {
+          await navigator.clipboard.writeText(texto);
+          this.guardadoOk = true;
+          setTimeout(() => this.guardadoOk = false, 1500);
+        } catch {
+          window.prompt('Copia manualmente:', texto);
+        }
+      },
+
       async cargar() {
         try {
-          const resp = await fetch('/tenant/config', { headers: { Authorization: 'Bearer ' + token } });
-          if (resp.ok) {
+          // Obtener tenant_id para construir URLs de webhook
+          const meResp = await apiFetch('/tenant/me');
+          if (meResp && meResp.ok) {
+            const me = await meResp.json();
+            this.tenantId = me.id;
+          }
+          const resp = await apiFetch('/tenant/config');
+          if (resp && resp.ok) {
             const data = await resp.json();
             // Actualizar cfg (indicadores) y form (valores de texto plano)
             this.cfg = {
@@ -321,6 +397,7 @@
               tiene_openai_key: data.tiene_openai_key,
               tiene_kling_key: data.tiene_kling_key,
               tiene_heygen_key: data.tiene_heygen_key,
+              tiene_higgsfield_key: data.tiene_higgsfield_key,
             };
             this.form.ai_provider = data.ai_provider || 'claude';
             this.form.video_provider = data.video_provider || 'kling';
@@ -343,14 +420,23 @@
       async guardar() {
         this.guardando = true; this.guardadoOk = false; this.errorMsg = '';
         try {
-          const resp = await fetch('/tenant/config', {
+          const resp = await apiFetch('/tenant/config', {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
             body: JSON.stringify(this.form),
           });
           if (!resp.ok) {
             const err = await resp.json().catch(() => ({}));
-            this.errorMsg = err.detail || 'Error al guardar'; return;
+            const detail = err.detail;
+            if (!detail) {
+              this.errorMsg = 'Error al guardar';
+            } else if (typeof detail === 'string') {
+              this.errorMsg = detail;
+            } else if (Array.isArray(detail)) {
+              this.errorMsg = detail.map(e => e.msg || e.message || JSON.stringify(e)).join('; ');
+            } else {
+              this.errorMsg = JSON.stringify(detail);
+            }
+            return;
           }
           const data = await resp.json();
           // Actualizar indicadores después de guardar
@@ -362,7 +448,7 @@
             tiene_heygen_key: data.tiene_heygen_key,
           };
           // Limpiar campos de keys para no reenviar
-          ['anthropic_api_key','gemini_api_key','openai_api_key','kling_api_key','heygen_api_key',
+          ['anthropic_api_key','gemini_api_key','openai_api_key','kling_api_key','heygen_api_key','higgsfield_api_key',
            'shopify_access_token','meta_app_id','meta_app_secret','meta_access_token',
            'waba_token','dropi_api_key','smtp_password'].forEach(k => this.form[k] = '');
           this.guardadoOk = true;

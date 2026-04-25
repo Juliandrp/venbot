@@ -49,3 +49,13 @@ boto3==1.35.81
 
 # Monitoring (optional)
 prometheus-fastapi-instrumentator==7.0.0
+
+# Pagos (opcionales — solo si PAYMENT_PROVIDER está activo)
+stripe==11.4.1
+mercadopago==2.2.3
+
+# Testing
+pytest==8.3.4
+pytest-asyncio==0.25.0
+pytest-cov==6.0.0
+aiosqlite==0.20.0

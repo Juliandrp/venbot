@@ -4,7 +4,7 @@ Worker: pipeline completo de generación de contenido IA para productos.
 Flujo:
   1. IA texto  → Claude | Gemini (free) | OpenAI
   2. Imágenes  → Imagen3 | DALL-E3 si hay key; Pollinations/Flux si no (gratis)
-  3. Video     → Kling | HeyGen si hay key; omitido si no
+  3. Video     → Kling | Higgsfield | HeyGen si hay key; omitido si no
   4. Shopify   → publicar si está configurado y hay precio
 """
 import asyncio
@@ -26,7 +26,8 @@ def generar_contenido_producto(self, product_id: str, tenant_id: str):
 
 
 async def _pipeline(product_id: str, tenant_id: str):
-    from app.database import AsyncSessionLocal
+    from app.database import make_celery_session
+    AsyncSessionLocal = make_celery_session()
     from app.models.product import Product, ProductContent
     from app.models.tenant import TenantConfig
     from app.services.ai_content import generar_contenido_producto as ai_generar
@@ -118,6 +119,7 @@ async def _pipeline(product_id: str, tenant_id: str):
         contenido.bullet_points = datos.get("bullet_points")
         contenido.variantes_copy = datos.get("variantes_copy")
         contenido.video_script = datos.get("video_script")
+        contenido.pipeline_paso = 1
         await db.commit()
 
         # ── Paso 2: Imágenes IA ──────────────────────────────────────────────────
@@ -179,6 +181,7 @@ async def _pipeline(product_id: str, tenant_id: str):
 
         if urls_imagenes:
             contenido.imagenes_generadas = urls_imagenes
+            contenido.pipeline_paso = 2
             await db.commit()
 
         # ── Paso 3: Video con Kling (por defecto) o HeyGen ─────────────────
@@ -218,6 +221,46 @@ async def _pipeline(product_id: str, tenant_id: str):
                         contenido.video_estado = "procesando"
                         await db.commit()
                         verificar_video_kling.apply_async(
+                            args=[str(producto.id), str(tenant_id)],
+                            countdown=60,
+                        )
+                    except Exception:
+                        pass
+
+            elif video_provider == "higgsfield":
+                higgs_key = None
+                if config and config.higgsfield_api_key_enc:
+                    higgs_key = decrypt_secret(config.higgsfield_api_key_enc)
+                elif _settings.higgsfield_api_key:
+                    higgs_key = _settings.higgsfield_api_key
+
+                if higgs_key:
+                    try:
+                        from app.services.higgsfield_service import HiggsfieldService
+                        higgs = HiggsfieldService(higgs_key)
+                        imagen_ref = None
+                        if image_urls:
+                            primer = image_urls[0]
+                            if primer.startswith("http"):
+                                imagen_ref = primer
+                            else:
+                                imagen_ref = f"{settings.app_base_url.rstrip('/')}{primer}"
+
+                        if imagen_ref:
+                            job_id = await higgs.crear_video_desde_imagen(
+                                image_url=imagen_ref,
+                                prompt=contenido.video_script,
+                                duracion=5, ratio="9:16",
+                            )
+                        else:
+                            job_id = await higgs.crear_video_desde_texto(
+                                prompt=contenido.video_script,
+                                duracion=5, ratio="9:16",
+                            )
+                        contenido.heygen_video_id = job_id
+                        contenido.video_estado = "procesando"
+                        await db.commit()
+                        verificar_video_higgsfield.apply_async(
                             args=[str(producto.id), str(tenant_id)],
                             countdown=60,
                         )
@@ -273,6 +316,7 @@ async def _pipeline(product_id: str, tenant_id: str):
             except Exception:
                 pass
 
+        contenido.pipeline_paso = 4
         producto.contenido_generado = True
         await db.commit()
 
@@ -289,7 +333,8 @@ def verificar_video_heygen(self, product_id: str, tenant_id: str):
 
 
 async def _verificar_video(product_id: str, tenant_id: str, task):
-    from app.database import AsyncSessionLocal
+    from app.database import make_celery_session
+    AsyncSessionLocal = make_celery_session()
     from app.models.product import ProductContent
     from app.models.tenant import TenantConfig
     from app.services.heygen import HeyGenService
@@ -341,7 +386,8 @@ def verificar_video_kling(self, product_id: str, tenant_id: str):
 
 
 async def _verificar_kling(product_id: str, tenant_id: str, task):
-    from app.database import AsyncSessionLocal
+    from app.database import make_celery_session
+    AsyncSessionLocal = make_celery_session()
     from app.models.product import ProductContent
     from app.models.tenant import TenantConfig
     from app.services.kling_service import KlingService
@@ -375,6 +421,64 @@ async def _verificar_kling(product_id: str, tenant_id: str, task):
 
         kling = KlingService(kling_key)
         estado = await kling.obtener_estado(contenido.heygen_video_id)
+
+        if estado["estado"] == "completed":
+            contenido.video_url = estado["video_url"]
+            contenido.video_estado = "completed"
+            await db.commit()
+        elif estado["estado"] == "failed":
+            contenido.video_estado = "failed"
+            await db.commit()
+        else:
+            raise task.retry()
+
+
+@celery_app.task(
+    name="app.workers.content_pipeline.verificar_video_higgsfield",
+    bind=True,
+    max_retries=20,
+    default_retry_delay=60,
+)
+def verificar_video_higgsfield(self, product_id: str, tenant_id: str):
+    """Polling del estado del video en Higgsfield hasta que esté listo."""
+    asyncio.run(_verificar_higgsfield(product_id, tenant_id, self))
+
+
+async def _verificar_higgsfield(product_id: str, tenant_id: str, task):
+    from app.database import make_celery_session
+    AsyncSessionLocal = make_celery_session()
+    from app.models.product import ProductContent
+    from app.models.tenant import TenantConfig
+    from app.services.higgsfield_service import HiggsfieldService
+    from app.core.security import decrypt_secret
+    from app.config import settings
+    from sqlalchemy import select
+
+    async with AsyncSessionLocal() as db:
+        pc_result = await db.execute(
+            select(ProductContent).where(ProductContent.product_id == uuid.UUID(product_id))
+        )
+        contenido = pc_result.scalar_one_or_none()
+        if not contenido or not contenido.heygen_video_id:
+            return
+        if contenido.video_estado == "completed":
+            return
+
+        config_result = await db.execute(
+            select(TenantConfig).where(TenantConfig.tenant_id == uuid.UUID(tenant_id))
+        )
+        config = config_result.scalar_one_or_none()
+
+        higgs_key = None
+        if config and config.higgsfield_api_key_enc:
+            higgs_key = decrypt_secret(config.higgsfield_api_key_enc)
+        elif settings.higgsfield_api_key:
+            higgs_key = settings.higgsfield_api_key
+        if not higgs_key:
+            return
+
+        higgs = HiggsfieldService(higgs_key)
+        estado = await higgs.obtener_estado(contenido.heygen_video_id)
 
         if estado["estado"] == "completed":
             contenido.video_url = estado["video_url"]

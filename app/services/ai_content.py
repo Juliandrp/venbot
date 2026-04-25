@@ -1,12 +1,10 @@
 """Generación de contenido IA via Claude API."""
 import base64
 import mimetypes
-import os
 import anthropic
 from tenacity import retry, stop_after_attempt, wait_exponential
 from app.config import settings
-
-MEDIA_ROOT = "/app/media"
+from app.services.storage import leer_url_como_bytes
 
 
 GRUPOS_EDAD = ["18-24", "25-34", "35-44", "45+"]
@@ -21,15 +19,16 @@ def _get_client(api_key: str | None = None) -> anthropic.Anthropic:
     return anthropic.Anthropic(api_key=api_key or settings.anthropic_api_key)
 
 
-def _url_a_bloque_imagen(url_relativa: str) -> dict | None:
-    """Convierte una URL relativa /media/... a un bloque de imagen base64 para Claude."""
-    ruta = os.path.join(MEDIA_ROOT, url_relativa.lstrip("/media/"))
-    if not os.path.exists(ruta):
+async def _url_a_bloque_imagen(url: str) -> dict | None:
+    """Convierte cualquier URL (local o S3) a un bloque de imagen base64 para Claude."""
+    datos = await leer_url_como_bytes(url)
+    if not datos:
         return None
-    mime = mimetypes.guess_type(ruta)[0] or "image/jpeg"
-    with open(ruta, "rb") as f:
-        datos = base64.standard_b64encode(f.read()).decode()
-    return {"type": "image", "source": {"type": "base64", "media_type": mime, "data": datos}}
+    mime = mimetypes.guess_type(url)[0] or "image/jpeg"
+    return {
+        "type": "image",
+        "source": {"type": "base64", "media_type": mime, "data": base64.standard_b64encode(datos).decode()},
+    }
 
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
@@ -67,7 +66,7 @@ Genera el siguiente JSON (sin markdown, solo el JSON):
     content: list = []
     if image_urls:
         for url in image_urls[:4]:
-            bloque = _url_a_bloque_imagen(url)
+            bloque = await _url_a_bloque_imagen(url)
             if bloque:
                 content.append(bloque)
     content.append({"type": "text", "text": prompt_text})

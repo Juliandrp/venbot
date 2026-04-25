@@ -1,11 +1,9 @@
 """Generación de contenido IA via Gemini 2 Flash."""
 import json
 import mimetypes
-import os
 from tenacity import retry, stop_after_attempt, wait_exponential
 from app.config import settings
-
-MEDIA_ROOT = "/app/media"
+from app.services.storage import leer_url_como_bytes
 
 MODEL = "gemini-2.0-flash"
 
@@ -21,17 +19,16 @@ def _get_client(api_key: str | None = None):
     return genai.Client(api_key=api_key or settings.gemini_api_key)
 
 
-def _leer_partes_imagen(image_urls: list[str]) -> list:
-    """Lee imágenes del disco y las convierte en Parts de Gemini."""
+async def _leer_partes_imagen(image_urls: list[str]) -> list:
+    """Lee imágenes (locales o S3) y las convierte en Parts de Gemini."""
     from google.genai import types
     partes = []
     for url in image_urls[:4]:
-        ruta = os.path.join(MEDIA_ROOT, url.lstrip("/media/"))
-        if not os.path.exists(ruta):
+        datos = await leer_url_como_bytes(url)
+        if not datos:
             continue
-        mime = mimetypes.guess_type(ruta)[0] or "image/jpeg"
-        with open(ruta, "rb") as f:
-            partes.append(types.Part.from_bytes(data=f.read(), mime_type=mime))
+        mime = mimetypes.guess_type(url)[0] or "image/jpeg"
+        partes.append(types.Part.from_bytes(data=datos, mime_type=mime))
     return partes
 
 
@@ -67,7 +64,7 @@ Genera el siguiente JSON (sin markdown, solo el JSON):
 
     contents = []
     if image_urls:
-        contents.extend(_leer_partes_imagen(image_urls))
+        contents.extend(await _leer_partes_imagen(image_urls))
     contents.append(prompt_text)
 
     response = await client.aio.models.generate_content(model=MODEL, contents=contents)

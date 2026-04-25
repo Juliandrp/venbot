@@ -15,6 +15,76 @@ async def mi_perfil(tenant: Tenant = Depends(get_current_tenant)):
     return tenant
 
 
+@router.get("/uso")
+async def mi_uso(
+    tenant: Tenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db),
+):
+    """Uso actual vs límite del plan, para mostrar en UI."""
+    from app.services.plan_limits import obtener_uso_actual
+    return await obtener_uso_actual(tenant, db)
+
+
+@router.get("/planes-disponibles")
+async def planes_disponibles(
+    tenant: Tenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db),
+):
+    """Planes activos que el tenant puede contratar."""
+    from app.models.tenant import SubscriptionPlan
+    result = await db.execute(
+        select(SubscriptionPlan)
+        .where(SubscriptionPlan.activo == True)
+        .order_by(SubscriptionPlan.precio_mensual.asc())
+    )
+    planes = result.scalars().all()
+    return {
+        "plan_actual_id": tenant.plan_id,
+        "estado": tenant.estado_suscripcion.value,
+        "planes": [
+            {
+                "id": p.id,
+                "nombre": p.nombre,
+                "tier": p.tier.value,
+                "precio_mensual_usd": p.precio_mensual / 100.0,
+                "max_productos": p.max_productos,
+                "max_campanas": p.max_campanas,
+                "max_mensajes_bot": p.max_mensajes_bot,
+                "actual": p.id == tenant.plan_id,
+            }
+            for p in planes
+        ],
+    }
+
+
+@router.post("/upgrade-plan")
+async def upgrade_plan(
+    payload: dict,
+    tenant: Tenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Cambia el plan del tenant. En producción esto debería integrarse con
+    Stripe/MercadoPago/PayPal. Por ahora marca el plan como activo.
+    """
+    from app.models.tenant import SubscriptionPlan, PlanStatus
+    plan_id = (payload or {}).get("plan_id")
+    if not plan_id:
+        raise HTTPException(status_code=400, detail="plan_id es obligatorio")
+
+    plan_check = await db.execute(
+        select(SubscriptionPlan).where(SubscriptionPlan.id == int(plan_id), SubscriptionPlan.activo == True)
+    )
+    plan = plan_check.scalar_one_or_none()
+    if not plan:
+        raise HTTPException(status_code=404, detail="Plan no encontrado o inactivo")
+
+    tenant.plan_id = plan.id
+    tenant.estado_suscripcion = PlanStatus.active
+    await db.commit()
+    return {"mensaje": "Plan activado", "plan": plan.nombre}
+
+
 @router.get("/config", response_model=TenantConfigOut)
 async def obtener_config(
     tenant: Tenant = Depends(get_current_tenant),
@@ -64,7 +134,7 @@ async def actualizar_config(
     # Proveedores IA
     if data.ai_provider in ("claude", "gemini", "openai"):
         config.ai_provider = data.ai_provider
-    if data.video_provider in ("kling", "heygen"):
+    if data.video_provider in ("kling", "heygen", "higgsfield"):
         config.video_provider = data.video_provider
 
     # Campos cifrados
@@ -82,6 +152,7 @@ async def actualizar_config(
         ("openai_api_key",      "openai_api_key_enc"),
         ("kling_api_key",       "kling_api_key_enc"),
         ("heygen_api_key",      "heygen_api_key_enc"),
+        ("higgsfield_api_key",  "higgsfield_api_key_enc"),
     ]
     for in_field, model_field in _enc:
         value = getattr(data, in_field, None)
@@ -114,5 +185,6 @@ def _config_to_out(config: TenantConfig) -> TenantConfigOut:
         tiene_openai_key=bool(config.openai_api_key_enc),
         tiene_kling_key=bool(config.kling_api_key_enc),
         tiene_heygen_key=bool(config.heygen_api_key_enc),
+        tiene_higgsfield_key=bool(config.higgsfield_api_key_enc),
         updated_at=config.updated_at,
     )

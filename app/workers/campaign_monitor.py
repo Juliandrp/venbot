@@ -9,7 +9,8 @@ def check_all_campaigns(self):
 
 
 async def _check_campaigns():
-    from app.database import AsyncSessionLocal
+    from app.database import make_celery_session
+    AsyncSessionLocal = make_celery_session()
     from app.models.campaign import Campaign, CampaignStatus, AdSet, AdPerformanceSnapshot
     from app.models.tenant import TenantConfig
     from app.services.meta_ads import MetaAdsService
