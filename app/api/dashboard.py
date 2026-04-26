@@ -117,3 +117,8 @@ async def vista_clientes_dashboard(request: Request):
 @router.get("/plan")
 async def vista_plan_tenant(request: Request):
     return templates.TemplateResponse("billing/index.html", {"request": request})
+
+
+@router.get("/manual")
+async def vista_manual(request: Request):
+    return templates.TemplateResponse("manual/index.html", {"request": request})
