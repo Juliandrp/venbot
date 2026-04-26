@@ -102,8 +102,11 @@ async def editar_campana(
     tenant: Tenant = Depends(get_current_tenant),
     db: AsyncSession = Depends(get_db),
 ):
-    """Edita los datos de una campaña. Si está activa en Meta, los cambios
-    de presupuesto se sincronizan en el próximo ciclo del campaign_monitor."""
+    """
+    Edita los datos de la campaña.
+    Si la campaña ya está creada en Meta (tiene meta_campaign_id), sincroniza
+    nombre, presupuesto y fecha_fin con la API de Meta Ads.
+    """
     result = await db.execute(
         select(Campaign).where(Campaign.id == campaign_id, Campaign.tenant_id == tenant.id)
     )
@@ -111,10 +114,32 @@ async def editar_campana(
     if not campana:
         raise HTTPException(status_code=404, detail="Campaña no encontrada")
 
-    for field, value in data.model_dump(exclude_unset=True).items():
+    cambios = data.model_dump(exclude_unset=True)
+    for field, value in cambios.items():
         setattr(campana, field, value)
     await db.commit()
     await db.refresh(campana)
+
+    # Sincronizar a Meta si la campaña ya existe allá
+    if campana.meta_campaign_id:
+        from app.models.tenant import TenantConfig
+        config_result = await db.execute(
+            select(TenantConfig).where(TenantConfig.tenant_id == tenant.id)
+        )
+        config = config_result.scalar_one_or_none()
+        if config and config.meta_access_token_enc:
+            try:
+                from app.services.meta_ads import MetaAdsService
+                service = MetaAdsService(config)
+                await service.actualizar_campana(campana, db)
+            except Exception as e:
+                # No fallar el endpoint si Meta rechaza — el cambio local quedó guardado
+                # El usuario puede reintentar manualmente y campaign_monitor lo detectará
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Cambios guardados localmente, pero Meta rechazó la sincronización: {str(e)[:200]}",
+                )
+
     return campana
 
 
