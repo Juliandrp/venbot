@@ -32,6 +32,7 @@ async def generar_contenido_producto(
     descripcion: str,
     api_key: str | None = None,
     image_urls: list[str] | None = None,
+    model: str | None = None,
 ) -> dict:
     client = _get_client(api_key)
 
@@ -62,7 +63,7 @@ Genera el siguiente JSON (sin markdown):
     content.append({"type": "text", "text": prompt_text})
 
     response = await client.chat.completions.create(
-        model="gpt-4o-mini",
+        model=model or "gpt-4o-mini",
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": content},

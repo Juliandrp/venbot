@@ -97,7 +97,14 @@ class TenantConfig(Base):
 
     # AI overrides (opcionales, usan las del platform si están vacíos)
     ai_provider: Mapped[str] = mapped_column(String(20), default="claude")   # claude | gemini | openai
-    video_provider: Mapped[str] = mapped_column(String(20), default="kling") # kling | heygen
+    video_provider: Mapped[str] = mapped_column(String(20), default="kling") # kling | heygen | higgsfield
+
+    # Modelo específico por proveedor (Google/Anthropic/OpenAI cambian nombres seguido)
+    claude_model: Mapped[str] = mapped_column(String(50), default="claude-sonnet-4-6")
+    gemini_model: Mapped[str] = mapped_column(String(50), default="gemini-2.5-flash")
+    openai_model: Mapped[str] = mapped_column(String(50), default="gpt-4o-mini")
+    kling_model: Mapped[str] = mapped_column(String(50), default="kling-v1-6")
+
     anthropic_api_key_enc: Mapped[str | None] = mapped_column(Text, nullable=True)
     gemini_api_key_enc: Mapped[str | None] = mapped_column(Text, nullable=True)
     openai_api_key_enc: Mapped[str | None] = mapped_column(Text, nullable=True)

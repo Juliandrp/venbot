@@ -36,33 +36,69 @@
           </template>
         </div>
 
-        <!-- Key dinámica según selección -->
-        <div x-show="form.ai_provider === 'claude'">
-          <label class="block text-xs text-gray-500 mb-1">
-            API Key de Anthropic
-            <span x-show="cfg.tiene_anthropic_key" class="text-green-400 ml-1">✓ configurada</span>
-          </label>
-          <input type="password" x-model="form.anthropic_api_key"
-                 class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 text-sm"
-                 :placeholder="cfg.tiene_anthropic_key ? '••••••••  (dejar vacío para no cambiar)' : 'sk-ant-...'" />
+        <!-- Key + Modelo dinámicos según selección -->
+        <div x-show="form.ai_provider === 'claude'" class="space-y-3">
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">
+              API Key de Anthropic
+              <span x-show="cfg.tiene_anthropic_key" class="text-green-400 ml-1">✓ configurada</span>
+            </label>
+            <input type="password" x-model="form.anthropic_api_key"
+                   class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 text-sm"
+                   :placeholder="cfg.tiene_anthropic_key ? '••••••••  (dejar vacío para no cambiar)' : 'sk-ant-...'" />
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">Modelo Claude</label>
+            <select x-model="form.claude_model"
+                    class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-indigo-500 text-sm">
+              <option value="claude-opus-4-7">Claude Opus 4.7 — máxima calidad (caro)</option>
+              <option value="claude-sonnet-4-6">Claude Sonnet 4.6 — recomendado (balance)</option>
+              <option value="claude-haiku-4-5">Claude Haiku 4.5 — rápido y barato</option>
+            </select>
+          </div>
         </div>
-        <div x-show="form.ai_provider === 'gemini'">
-          <label class="block text-xs text-gray-500 mb-1">
-            API Key de Google Gemini
-            <span x-show="cfg.tiene_gemini_key" class="text-green-400 ml-1">✓ configurada</span>
-          </label>
-          <input type="password" x-model="form.gemini_api_key"
-                 class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 text-sm"
-                 :placeholder="cfg.tiene_gemini_key ? '••••••••  (dejar vacío para no cambiar)' : 'AIzaSy...'" />
+
+        <div x-show="form.ai_provider === 'gemini'" class="space-y-3">
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">
+              API Key de Google Gemini
+              <span x-show="cfg.tiene_gemini_key" class="text-green-400 ml-1">✓ configurada</span>
+            </label>
+            <input type="password" x-model="form.gemini_api_key"
+                   class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 text-sm"
+                   :placeholder="cfg.tiene_gemini_key ? '••••••••  (dejar vacío para no cambiar)' : 'AIzaSy...'" />
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">Modelo Gemini</label>
+            <select x-model="form.gemini_model"
+                    class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-indigo-500 text-sm">
+              <option value="gemini-2.5-pro">Gemini 2.5 Pro — máxima calidad</option>
+              <option value="gemini-2.5-flash">Gemini 2.5 Flash — recomendado</option>
+              <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite — ultra rápido</option>
+              <option value="gemini-1.5-pro">Gemini 1.5 Pro — legacy</option>
+            </select>
+          </div>
         </div>
-        <div x-show="form.ai_provider === 'openai'">
-          <label class="block text-xs text-gray-500 mb-1">
-            API Key de OpenAI (ChatGPT)
-            <span x-show="cfg.tiene_openai_key" class="text-green-400 ml-1">✓ configurada</span>
-          </label>
-          <input type="password" x-model="form.openai_api_key"
-                 class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 text-sm"
-                 :placeholder="cfg.tiene_openai_key ? '••••••••  (dejar vacío para no cambiar)' : 'sk-...'" />
+
+        <div x-show="form.ai_provider === 'openai'" class="space-y-3">
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">
+              API Key de OpenAI (ChatGPT)
+              <span x-show="cfg.tiene_openai_key" class="text-green-400 ml-1">✓ configurada</span>
+            </label>
+            <input type="password" x-model="form.openai_api_key"
+                   class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 text-sm"
+                   :placeholder="cfg.tiene_openai_key ? '••••••••  (dejar vacío para no cambiar)' : 'sk-...'" />
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">Modelo OpenAI</label>
+            <select x-model="form.openai_model"
+                    class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-indigo-500 text-sm">
+              <option value="gpt-4o">GPT-4o — mejor calidad</option>
+              <option value="gpt-4o-mini">GPT-4o mini — recomendado</option>
+              <option value="gpt-5">GPT-5 — si tienes acceso</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -347,6 +383,10 @@
       tenantId: '',
       form: {
         ai_provider: 'claude', video_provider: 'kling',
+        claude_model: 'claude-sonnet-4-6',
+        gemini_model: 'gemini-2.5-flash',
+        openai_model: 'gpt-4o-mini',
+        kling_model: 'kling-v1-6',
         anthropic_api_key: '', gemini_api_key: '', openai_api_key: '',
         kling_api_key: '', heygen_api_key: '', higgsfield_api_key: '',
         shopify_store_url: '', shopify_access_token: '',
@@ -401,6 +441,10 @@
             };
             this.form.ai_provider = data.ai_provider || 'claude';
             this.form.video_provider = data.video_provider || 'kling';
+            this.form.claude_model = data.claude_model || 'claude-sonnet-4-6';
+            this.form.gemini_model = data.gemini_model || 'gemini-2.5-flash';
+            this.form.openai_model = data.openai_model || 'gpt-4o-mini';
+            this.form.kling_model = data.kling_model || 'kling-v1-6';
             this.form.shopify_store_url = data.shopify_store_url || '';
             this.form.meta_ad_account_id = data.meta_ad_account_id || '';
             this.form.meta_pixel_id = data.meta_pixel_id || '';

@@ -77,6 +77,7 @@ async def _pipeline(product_id: str, tenant_id: str):
                         descripcion=producto.descripcion_input or producto.nombre,
                         api_key=anthropic_key,
                         image_urls=image_urls or None,
+                        model=config.claude_model if config else None,
                     )
                 except Exception:
                     datos = None
@@ -95,6 +96,7 @@ async def _pipeline(product_id: str, tenant_id: str):
                         descripcion=producto.descripcion_input or producto.nombre,
                         api_key=openai_content_key,
                         image_urls=image_urls or None,
+                        model=config.openai_model if config else None,
                     )
                     datos = dados
                 except Exception:
@@ -113,6 +115,7 @@ async def _pipeline(product_id: str, tenant_id: str):
                 descripcion=producto.descripcion_input or producto.nombre,
                 api_key=gemini_key,
                 image_urls=image_urls or None,
+                model=config.gemini_model if config else None,
             )
         contenido.titulo_seo = datos.get("titulo_seo")
         contenido.descripcion_seo = datos.get("descripcion_seo")
