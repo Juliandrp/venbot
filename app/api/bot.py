@@ -132,13 +132,24 @@ async def responder_conversacion(
     tenant: Tenant = Depends(get_current_tenant),
     db: AsyncSession = Depends(get_db),
 ):
-    """Permite que un agente humano envíe respuesta al cliente."""
+    """
+    Envía un mensaje del agente humano al cliente.
+
+    Modos según `tomar_control`:
+      - False (default — "Asistir"): mensaje sale al cliente, conversación
+        queda activa, el bot sigue respondiendo siguientes mensajes con
+        este texto en el historial como contexto.
+      - True ("Tomar control"): conversación pasa a 'transferida', el bot
+        deja de responder hasta que se cierre.
+    """
     import uuid
     from app.models.bot import Message, MessageRole, ConversationStatus, Canal
     from app.models.customer import Customer
     from app.core.security import decrypt_secret
 
-    texto = (payload or {}).get("texto", "").strip()
+    payload = payload or {}
+    texto = (payload.get("texto") or "").strip()
+    tomar_control = bool(payload.get("tomar_control", False))
     if not texto:
         raise HTTPException(status_code=400, detail="El texto del mensaje es obligatorio")
 
@@ -187,7 +198,10 @@ async def responder_conversacion(
         meta_message_id=meta_message_id,
     )
     db.add(msg)
-    conv.estado = ConversationStatus.transferida
+    # Solo cambiar a 'transferida' si el agente quiere tomar control total.
+    # En modo asistir, conversación queda activa y el bot sigue respondiendo.
+    if tomar_control:
+        conv.estado = ConversationStatus.transferida
     await db.commit()
     await db.refresh(msg)
 
@@ -198,6 +212,7 @@ async def responder_conversacion(
         "created_at": msg.created_at.isoformat(),
         "enviado_externo": meta_message_id is not None,
         "error": error_envio,
+        "estado_conversacion": conv.estado.value,
     }
 
 
