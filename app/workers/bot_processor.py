@@ -52,12 +52,14 @@ async def _responder_bot(tenant_id: str, external_user_id: str, texto: str, cana
     AsyncSessionLocal = make_celery_session()
     from app.models.tenant import Tenant, TenantConfig
     from app.models.customer import Customer
+    from app.models.product import Product, ProductContent
     from app.models.bot import Conversation, Message, MessageRole, ConversationStatus, Canal
     from app.services.ai_content import generar_respuesta_bot
     from app.services.whatsapp import WhatsAppService
     from app.services.plan_limits import verificar_puede_enviar_mensaje_bot
+    from app.services.dropi_service import DropiService
     from app.core.security import decrypt_secret
-    from sqlalchemy import select
+    from sqlalchemy import select, desc
 
     async with AsyncSessionLocal() as db:
         # Verificar tenant + límites de plan
@@ -138,6 +140,58 @@ async def _responder_bot(tenant_id: str, external_user_id: str, texto: str, cana
             for m in hist_result.scalars().all()
         ]
 
+        # ── Identificar producto activo de la conversación ──
+        producto_activo = None
+        contenido_activo = None
+        if conversacion.product_id:
+            p_result = await db.execute(
+                select(Product).where(Product.id == conversacion.product_id)
+            )
+            producto_activo = p_result.scalar_one_or_none()
+        if not producto_activo:
+            # Fallback: el producto más reciente con contenido generado del tenant
+            p_result = await db.execute(
+                select(Product)
+                .where(
+                    Product.tenant_id == uuid.UUID(tenant_id),
+                    Product.activo == True,
+                    Product.contenido_generado == True,
+                )
+                .order_by(desc(Product.created_at))
+                .limit(1)
+            )
+            producto_activo = p_result.scalar_one_or_none()
+            if producto_activo:
+                conversacion.product_id = producto_activo.id
+
+        if producto_activo:
+            pc_result = await db.execute(
+                select(ProductContent).where(ProductContent.product_id == producto_activo.id)
+            )
+            contenido_activo = pc_result.scalar_one_or_none()
+
+        # ── Construir contexto rico del producto ──
+        contexto_producto = _construir_contexto_producto(producto_activo, contenido_activo)
+
+        # ── Si el cliente pregunta por envío, cotizar con Dropi e inyectar al contexto ──
+        if _menciona_envio(texto) and config.dropi_api_key_enc and config.dropi_store_id:
+            ciudad, departamento = _extraer_ubicacion(texto, cliente)
+            if ciudad:
+                try:
+                    dropi_key = decrypt_secret(config.dropi_api_key_enc)
+                    dropi = DropiService(dropi_key, config.dropi_store_id)
+                    cotizacion = await dropi.cotizar_envio(ciudad, departamento or "")
+                    if cotizacion:
+                        contexto_producto += "\n\n--- INFO DE ENVÍO (consultada en Dropi ahora mismo) ---\n"
+                        contexto_producto += f"Destino: {ciudad}{', ' + departamento if departamento else ''}\n"
+                        for t in cotizacion["transportadoras"]:
+                            contexto_producto += f"  • {t['nombre']}: ${t['valor']:,.0f} COP, entrega en {t['dias']} días\n"
+                        contexto_producto += f"Rango: ${cotizacion['min']:,.0f} - ${cotizacion['max']:,.0f} COP\n"
+                    else:
+                        contexto_producto += f"\n\n[Aviso: Dropi no tiene cobertura confirmada en {ciudad}]"
+                except Exception:
+                    pass  # Si Dropi falla, el bot improvisa
+
         # Generar respuesta (Claude o Gemini según config del tenant)
         ai_provider = getattr(config, "ai_provider", None) or "claude"
         if ai_provider == "gemini":
@@ -150,8 +204,9 @@ async def _responder_bot(tenant_id: str, external_user_id: str, texto: str, cana
                 gemini_key = _settings.gemini_api_key
             respuesta, confianza = await gemini_bot(
                 historial=historial,
-                contexto_producto="Tienda de e-commerce",
+                contexto_producto=contexto_producto,
                 api_key=gemini_key,
+                model=getattr(config, "gemini_model", None),
             )
         else:
             anthropic_key = None
@@ -159,8 +214,9 @@ async def _responder_bot(tenant_id: str, external_user_id: str, texto: str, cana
                 anthropic_key = decrypt_secret(config.anthropic_api_key_enc)
             respuesta, confianza = await generar_respuesta_bot(
                 historial=historial,
-                contexto_producto="Tienda de e-commerce",
+                contexto_producto=contexto_producto,
                 api_key=anthropic_key,
+                model=getattr(config, "claude_model", None),
             )
 
         # Guardar respuesta del bot
@@ -184,3 +240,101 @@ async def _responder_bot(tenant_id: str, external_user_id: str, texto: str, cana
             waba_token = decrypt_secret(config.waba_token_enc)
             wa = WhatsAppService(config.waba_phone_number_id, waba_token)
             await wa.enviar_texto(external_user_id, respuesta)
+
+
+# ─── Helpers para construir contexto del bot ─────────────────────
+
+def _construir_contexto_producto(producto, contenido) -> str:
+    """Genera el contexto que recibe el bot para responder con info real."""
+    if not producto:
+        return (
+            "El cliente está preguntando por nuestra tienda en general. "
+            "No tienes un producto específico cargado todavía. "
+            "Si pregunta por un producto puntual, indícale que lo derivarás a un asesor."
+        )
+
+    partes = [f"PRODUCTO QUE ESTÁS VENDIENDO: {producto.nombre}"]
+
+    if producto.precio:
+        partes.append(f"Precio: ${float(producto.precio):,.0f} COP")
+        if producto.precio_comparacion:
+            partes.append(f"Precio sin descuento: ${float(producto.precio_comparacion):,.0f} COP (¡resalta el ahorro!)")
+
+    if producto.inventario is not None:
+        if producto.inventario == 0:
+            partes.append("⚠️ AGOTADO. No prometas envío inmediato; ofrece reservar para próximo lote.")
+        elif producto.inventario < 10:
+            partes.append(f"Solo quedan {producto.inventario} unidades — usa urgencia honesta.")
+        else:
+            partes.append(f"Disponible: {producto.inventario} unidades en stock.")
+
+    if producto.descripcion_input:
+        partes.append(f"\nDescripción interna del vendedor:\n{producto.descripcion_input}")
+
+    if contenido:
+        if contenido.descripcion_seo:
+            partes.append(f"\nDescripción del producto (úsala como base):\n{contenido.descripcion_seo}")
+        if contenido.bullet_points:
+            partes.append("\nBeneficios principales:")
+            for b in contenido.bullet_points:
+                partes.append(f"  • {b}")
+        if contenido.video_script:
+            partes.append(f"\nPitch de venta de referencia:\n{contenido.video_script}")
+
+    if producto.shopify_url:
+        partes.append(f"\nLink directo de compra: {producto.shopify_url}")
+
+    partes.append(
+        "\n\nREGLAS:\n"
+        "  - NO inventes características que no estén arriba\n"
+        "  - NO inventes precios; usa solo el que está aquí\n"
+        "  - Si te preguntan algo que no sabes, di que lo consultas con un asesor\n"
+        "  - Cuando el cliente quiera comprar, pide nombre, teléfono, dirección, ciudad, departamento"
+    )
+    return "\n".join(partes)
+
+
+_KEYWORDS_ENVIO = (
+    "envio", "envío", "envias", "envías", "envia", "envía", "envian", "envían",
+    "shipping", "domicilio", "entregan", "entrega",
+    "cuanto vale el", "cuánto vale el", "cuanto cuesta el", "cuánto cuesta el",
+    "llega a", "llegan a", "llegar a",
+)
+
+
+def _menciona_envio(texto: str) -> bool:
+    """Heurística simple para detectar si el cliente pregunta por envío."""
+    t = texto.lower()
+    return any(kw in t for kw in _KEYWORDS_ENVIO)
+
+
+# Ciudades principales de Colombia para extraer del texto si el cliente las menciona
+_CIUDADES_CO = {
+    "bogota": "Bogotá", "bogotá": "Bogotá",
+    "medellin": "Medellín", "medellín": "Medellín",
+    "cali": "Cali", "barranquilla": "Barranquilla",
+    "cartagena": "Cartagena", "bucaramanga": "Bucaramanga",
+    "pereira": "Pereira", "manizales": "Manizales",
+    "cucuta": "Cúcuta", "cúcuta": "Cúcuta",
+    "ibague": "Ibagué", "ibagué": "Ibagué",
+    "santa marta": "Santa Marta", "armenia": "Armenia",
+    "neiva": "Neiva", "pasto": "Pasto",
+    "monteria": "Montería", "montería": "Montería",
+    "villavicencio": "Villavicencio", "valledupar": "Valledupar",
+    "popayan": "Popayán", "popayán": "Popayán",
+    "tunja": "Tunja", "sincelejo": "Sincelejo",
+}
+
+
+def _extraer_ubicacion(texto: str, cliente=None) -> tuple[str | None, str | None]:
+    """
+    Intenta extraer (ciudad, departamento) del mensaje del cliente.
+    Si no encuentra, usa la del cliente (si está cargada en su perfil).
+    """
+    t = texto.lower()
+    for slug, oficial in _CIUDADES_CO.items():
+        if slug in t:
+            return (oficial, None)
+    if cliente and cliente.ciudad:
+        return (cliente.ciudad, cliente.departamento)
+    return (None, None)

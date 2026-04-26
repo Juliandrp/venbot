@@ -70,6 +70,7 @@ class ProductOut(BaseModel):
     publicado_shopify: bool
     shopify_product_id: str | None = None
     shopify_url: str | None
+    dropi_product_id: str | None = None
     activo: bool
     created_at: datetime
 

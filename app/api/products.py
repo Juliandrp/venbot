@@ -84,6 +84,141 @@ async def crear_producto(
     return producto
 
 
+# ─── Importación desde Dropi ──────────────────────────────────
+
+@router.get("/dropi/disponibles")
+async def listar_productos_dropi(
+    page: int = 1,
+    limit: int = 30,
+    search: str | None = None,
+    tenant: Tenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db),
+):
+    """Lista productos disponibles en el catálogo Dropi del tenant."""
+    from app.models.tenant import TenantConfig
+    from app.services.dropi_service import DropiService
+    from app.core.security import decrypt_secret
+
+    config_q = await db.execute(select(TenantConfig).where(TenantConfig.tenant_id == tenant.id))
+    config = config_q.scalar_one_or_none()
+    if not config or not config.dropi_api_key_enc or not config.dropi_store_id:
+        raise HTTPException(status_code=400, detail="Configura primero las credenciales de Dropi en Configuración")
+
+    dropi_key = decrypt_secret(config.dropi_api_key_enc)
+    dropi = DropiService(dropi_key, config.dropi_store_id)
+    try:
+        data = await dropi.listar_productos(page=page, limit=limit, search=search)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Dropi rechazó la consulta: {str(e)[:200]}")
+
+    # Marcar cuáles ya están importados
+    ids_dropi = [item["id"] for item in data["items"] if item["id"]]
+    if ids_dropi:
+        existentes_q = await db.execute(
+            select(Product.dropi_product_id).where(
+                Product.tenant_id == tenant.id,
+                Product.dropi_product_id.in_(ids_dropi),
+            )
+        )
+        ya_importados = {row[0] for row in existentes_q.all()}
+        for item in data["items"]:
+            item["ya_importado"] = item["id"] in ya_importados
+
+    return data
+
+
+@router.post("/dropi/importar", status_code=201)
+async def importar_productos_dropi(
+    payload: dict,
+    tenant: Tenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Importa productos desde Dropi. Body: {"dropi_ids": ["1","2","3"]}.
+    Crea cada uno como Product (skip si ya existe). Opcionalmente lanza
+    pipeline IA si payload incluye {"generar_contenido": true}.
+    """
+    from app.models.tenant import TenantConfig
+    from app.services.dropi_service import DropiService
+    from app.services.plan_limits import verificar_puede_crear_producto
+    from app.core.security import decrypt_secret
+
+    dropi_ids = payload.get("dropi_ids") or []
+    generar_contenido = bool(payload.get("generar_contenido", True))
+    if not dropi_ids:
+        raise HTTPException(status_code=400, detail="Debes enviar al menos un dropi_id en 'dropi_ids'")
+
+    config_q = await db.execute(select(TenantConfig).where(TenantConfig.tenant_id == tenant.id))
+    config = config_q.scalar_one_or_none()
+    if not config or not config.dropi_api_key_enc or not config.dropi_store_id:
+        raise HTTPException(status_code=400, detail="Configura primero las credenciales de Dropi")
+
+    dropi_key = decrypt_secret(config.dropi_api_key_enc)
+    dropi = DropiService(dropi_key, config.dropi_store_id)
+
+    importados = []
+    saltados = []
+    errores = []
+
+    for did in dropi_ids:
+        # Skip si ya existe
+        existente_q = await db.execute(
+            select(Product).where(
+                Product.tenant_id == tenant.id,
+                Product.dropi_product_id == str(did),
+            )
+        )
+        if existente_q.scalar_one_or_none():
+            saltados.append({"dropi_id": did, "razon": "ya importado"})
+            continue
+
+        # Verificar plan limit (uno por uno; falla suave)
+        try:
+            await verificar_puede_crear_producto(tenant, db)
+        except HTTPException as e:
+            errores.append({"dropi_id": did, "razon": e.detail})
+            break  # No tiene sentido seguir si no hay cupo
+
+        # Traer detalle de Dropi
+        det = await dropi.obtener_producto(str(did))
+        if not det:
+            errores.append({"dropi_id": did, "razon": "no encontrado en Dropi"})
+            continue
+
+        # Crear el producto
+        producto = Product(
+            tenant_id=tenant.id,
+            nombre=det["nombre"],
+            descripcion_input=det["descripcion"] or None,
+            precio=det["precio"] or None,
+            precio_comparacion=det.get("precio_comparacion"),
+            inventario=det.get("inventario") or 0,
+            imagenes_originales=det.get("imagenes") or None,
+            dropi_product_id=det["id"],
+        )
+        db.add(producto)
+        await db.commit()
+        await db.refresh(producto)
+
+        # Lanzar pipeline IA si lo pidieron
+        if generar_contenido:
+            from app.workers.content_pipeline import generar_contenido_producto as gen_task
+            gen_task.delay(str(producto.id), str(tenant.id))
+
+        importados.append({"dropi_id": did, "venbot_id": str(producto.id), "nombre": producto.nombre})
+
+    return {
+        "importados": len(importados),
+        "saltados": len(saltados),
+        "errores": len(errores),
+        "detalle": {
+            "importados": importados,
+            "saltados": saltados,
+            "errores": errores,
+        },
+    }
+
+
 @router.post("/{product_id}/imagenes", response_model=ProductOut)
 async def subir_imagenes(
     product_id: uuid.UUID,

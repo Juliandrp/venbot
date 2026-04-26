@@ -24,6 +24,9 @@ class Product(Base):
     shopify_product_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
     shopify_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
+    # Si fue importado desde Dropi (evita duplicados al re-importar)
+    dropi_product_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+
     activo: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
