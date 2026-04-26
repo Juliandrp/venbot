@@ -3,38 +3,31 @@ Inicialización de la base de datos al arrancar la app.
 
 Estrategia:
   1. Si la BD está vacía (sin tabla `alembic_version`) → ejecuta create_all
-     y marca como migrada (`alembic stamp head`).
-  2. Si ya está versionada → ejecuta `alembic upgrade head` para aplicar
-     migraciones pendientes.
+     y marca como migrada insertando la última revisión.
+  2. Si ya está versionada → intenta `alembic upgrade head`. Si falla por
+     conflictos async/sync, registra warning y deja que el código siga
+     (las tablas ya están creadas desde versiones previas).
 
-Esto permite ambos flujos:
-  - Despliegue limpio (Coolify primera vez): crea esquema + stamp
-  - Despliegue posterior: aplica solo nuevas migraciones
+Por qué insertamos en alembic_version manualmente en lugar de usar
+`command.stamp`: stamp dispara `env.py` que llama `asyncio.run()` —
+esto choca con el event loop de uvicorn y produce RuntimeWarnings
+y reinicios silenciosos del contenedor en producción.
 """
-import os
 from pathlib import Path
-from alembic.config import Config
-from alembic import command
-from sqlalchemy import inspect
+from sqlalchemy import inspect, text
 
 
-def _alembic_config() -> Config:
-    """Construye la config de Alembic apuntando a la app/."""
-    repo_root = Path(__file__).resolve().parent.parent
-    cfg = Config(str(repo_root / "alembic.ini"))
-    cfg.set_main_option("script_location", str(repo_root / "alembic"))
-    return cfg
+# Última revisión de Alembic conocida. Sincronizar con el archivo más reciente
+# en alembic/versions/ (ej. "0002_higgsfield_key.py" → "0002").
+LATEST_REVISION = "0002"
 
 
 async def init_database():
     """Llamado desde el lifespan de FastAPI al arrancar."""
     from app.database import engine, Base
-    import app.models  # noqa: F401  carga todos los modelos
-
-    cfg = _alembic_config()
+    import app.models  # noqa: F401  registra todos los modelos en Base.metadata
 
     async with engine.begin() as conn:
-        # Verificar si existe la tabla alembic_version
         def _check_versionada(sync_conn):
             inspector = inspect(sync_conn)
             return "alembic_version" in inspector.get_table_names()
@@ -42,19 +35,21 @@ async def init_database():
         ya_versionada = await conn.run_sync(_check_versionada)
 
         if not ya_versionada:
-            # BD virgen o legacy sin Alembic: crear esquema y marcar como migrada
+            # BD virgen: crear esquema completo y stampar manualmente
             await conn.run_sync(Base.metadata.create_all)
-            print("[db_init] Esquema creado con create_all (BD virgen)")
-
-            def _stamp(sync_conn):
-                cfg.attributes["connection"] = sync_conn
-                command.stamp(cfg, "head")
-            await conn.run_sync(_stamp)
-            print("[db_init] BD marcada como 'head' (alembic stamp)")
+            await conn.execute(text(
+                "CREATE TABLE IF NOT EXISTS alembic_version ("
+                "version_num VARCHAR(32) NOT NULL PRIMARY KEY)"
+            ))
+            await conn.execute(text(
+                f"INSERT INTO alembic_version (version_num) VALUES ('{LATEST_REVISION}') "
+                f"ON CONFLICT (version_num) DO NOTHING"
+            ))
+            print(f"[db_init] Esquema creado con create_all + stamped en '{LATEST_REVISION}'")
         else:
-            # BD versionada: aplicar migraciones pendientes
-            def _upgrade(sync_conn):
-                cfg.attributes["connection"] = sync_conn
-                command.upgrade(cfg, "head")
-            await conn.run_sync(_upgrade)
-            print("[db_init] Migraciones aplicadas (alembic upgrade head)")
+            # BD existente: solo asegura que tenga la última versión registrada
+            # Las migraciones reales deben correr ANTES (start.sh: alembic upgrade head)
+            current = (await conn.execute(text(
+                "SELECT version_num FROM alembic_version LIMIT 1"
+            ))).scalar()
+            print(f"[db_init] BD versionada en '{current}' (esperado: '{LATEST_REVISION}')")

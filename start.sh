@@ -22,9 +22,33 @@ echo "[start.sh] Iniciando Venbot en puerto $PORT"
 mkdir -p /app/media /app/celerybeat
 chmod -R 755 /app/media /app/celerybeat
 
-# Migraciones — falla suave: si la BD no responde aún, init_database lo manejará al arrancar uvicorn
-echo "[start.sh] Aplicando migraciones Alembic..."
-alembic upgrade head 2>&1 || echo "[start.sh] WARN: alembic falló, init_database tomará el control en lifespan"
+# Migraciones — falla suave en BD virgen (init_database se encarga en lifespan)
+# Solo intentamos si ya existe la tabla alembic_version
+echo "[start.sh] Verificando si la BD necesita migración..."
+python -c "
+import asyncio, sys
+from sqlalchemy import inspect
+from app.database import engine
+
+async def check():
+    async with engine.begin() as conn:
+        def _check(sync_conn):
+            return 'alembic_version' in inspect(sync_conn).get_table_names()
+        return await conn.run_sync(_check)
+
+try:
+    if asyncio.run(check()):
+        sys.exit(0)
+    sys.exit(1)
+except Exception as e:
+    print(f'[check] error: {e}', file=sys.stderr)
+    sys.exit(1)
+" && {
+    echo "[start.sh] BD ya versionada, aplicando alembic upgrade head..."
+    alembic upgrade head 2>&1 || echo "[start.sh] WARN: alembic upgrade falló (continuamos)"
+} || {
+    echo "[start.sh] BD virgen, init_database creará el esquema al arrancar uvicorn"
+}
 
 # Celery worker (background) — procesa pipeline IA, bot, notificaciones
 echo "[start.sh] Lanzando Celery worker en background..."
