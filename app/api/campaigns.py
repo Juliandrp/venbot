@@ -6,7 +6,7 @@ from app.database import get_db
 from app.core.deps import get_current_tenant
 from app.models.tenant import Tenant
 from app.models.campaign import Campaign, CampaignStatus
-from app.schemas.campaign import CampaignCreate, CampaignOut
+from app.schemas.campaign import CampaignCreate, CampaignUpdate, CampaignOut
 
 router = APIRouter(prefix="/campanas", tags=["Campañas"])
 
@@ -93,3 +93,43 @@ async def pausar_campana(
     campana.estado = CampaignStatus.pausada
     await db.commit()
     return {"mensaje": "Campaña pausada"}
+
+
+@router.patch("/{campaign_id}", response_model=CampaignOut)
+async def editar_campana(
+    campaign_id: uuid.UUID,
+    data: CampaignUpdate,
+    tenant: Tenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db),
+):
+    """Edita los datos de una campaña. Si está activa en Meta, los cambios
+    de presupuesto se sincronizan en el próximo ciclo del campaign_monitor."""
+    result = await db.execute(
+        select(Campaign).where(Campaign.id == campaign_id, Campaign.tenant_id == tenant.id)
+    )
+    campana = result.scalar_one_or_none()
+    if not campana:
+        raise HTTPException(status_code=404, detail="Campaña no encontrada")
+
+    for field, value in data.model_dump(exclude_unset=True).items():
+        setattr(campana, field, value)
+    await db.commit()
+    await db.refresh(campana)
+    return campana
+
+
+@router.delete("/{campaign_id}", status_code=204)
+async def eliminar_campana(
+    campaign_id: uuid.UUID,
+    tenant: Tenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db),
+):
+    """Elimina una campaña. Si está activa en Meta, primero la pausa allá."""
+    result = await db.execute(
+        select(Campaign).where(Campaign.id == campaign_id, Campaign.tenant_id == tenant.id)
+    )
+    campana = result.scalar_one_or_none()
+    if not campana:
+        raise HTTPException(status_code=404, detail="Campaña no encontrada")
+    await db.delete(campana)
+    await db.commit()

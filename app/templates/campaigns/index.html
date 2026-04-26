@@ -88,6 +88,14 @@
                         class="px-3 py-1 bg-green-700 hover:bg-green-600 text-white text-xs rounded-lg transition-colors">
                   Reactivar
                 </button>
+                <button @click="editar(c)"
+                        class="px-3 py-1 bg-gray-800 hover:bg-indigo-700 text-gray-300 hover:text-white text-xs rounded-lg transition-colors">
+                  Editar
+                </button>
+                <button @click="eliminar(c.id, c.nombre)"
+                        class="px-3 py-1 bg-gray-800 hover:bg-red-700 text-gray-400 hover:text-white text-xs rounded-lg transition-colors">
+                  ✕
+                </button>
               </td>
             </tr>
           </template>
@@ -102,7 +110,7 @@
        @click.self="modal = false">
     <div class="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-lg shadow-2xl">
       <div class="flex items-center justify-between mb-6">
-        <h3 class="text-lg font-semibold text-white">Nueva campaña Meta Ads</h3>
+        <h3 class="text-lg font-semibold text-white" x-text="form.id ? 'Editar campaña' : 'Nueva campaña Meta Ads'"></h3>
         <button @click="modal = false" class="text-gray-500 hover:text-white text-xl leading-none">&times;</button>
       </div>
 
@@ -156,9 +164,9 @@
         <div x-show="errorMsg" class="text-red-400 text-sm" x-text="errorMsg"></div>
 
         <div class="flex gap-3 pt-2">
-          <button @click="crear()" :disabled="guardando"
+          <button @click="guardar()" :disabled="guardando"
                   class="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl transition-colors disabled:opacity-50"
-                  x-text="guardando ? 'Creando...' : 'Crear campaña'"></button>
+                  x-text="guardando ? 'Guardando...' : (form.id ? 'Guardar cambios' : 'Crear campaña')"></button>
           <button @click="modal = false"
                   class="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl transition-colors">
             Cancelar
@@ -176,10 +184,11 @@
   requireAuth();
 
   function campanas() {
+    const FORM_VACIO = () => ({ id: null, nombre: '', product_id: '', presupuesto_diario: 10, roas_minimo: 2.5, fecha_inicio: '', fecha_fin: '' });
     return {
       items: [], productos: [], cargando: true,
       modal: false, guardando: false, errorMsg: '',
-      form: { nombre: '', product_id: '', presupuesto_diario: 10, roas_minimo: 2.5, fecha_inicio: '', fecha_fin: '' },
+      form: FORM_VACIO(),
 
       async cargar() {
         const resp = await apiFetch('/campanas/');
@@ -187,28 +196,64 @@
         this.cargando = false;
       },
 
-      async abrirModal() {
-        this.errorMsg = '';
-        this.form = { nombre: '', product_id: '', presupuesto_diario: 10, roas_minimo: 2.5, fecha_inicio: '', fecha_fin: '' };
+      async _cargarProductos() {
         if (!this.productos.length) {
           const r = await apiFetch('/productos/');
-          if (r && r.ok) this.productos = await r.json();
+          if (r && r.ok) {
+            const data = await r.json();
+            // /productos/ devuelve { total, items } o array según endpoint
+            this.productos = Array.isArray(data) ? data : (data.items || []);
+          }
         }
+      },
+
+      async abrirModal() {
+        this.errorMsg = '';
+        this.form = FORM_VACIO();
+        await this._cargarProductos();
         this.modal = true;
       },
 
-      async crear() {
+      async editar(c) {
+        this.errorMsg = '';
+        await this._cargarProductos();
+        // Recortar fechas a YYYY-MM-DD para input[type=date]
+        const fmt = d => d ? d.substring(0, 10) : '';
+        this.form = {
+          id: c.id,
+          nombre: c.nombre || '',
+          product_id: c.product_id || '',
+          presupuesto_diario: c.presupuesto_diario || 0,
+          roas_minimo: c.roas_minimo ?? '',
+          fecha_inicio: fmt(c.fecha_inicio),
+          fecha_fin: fmt(c.fecha_fin),
+        };
+        this.modal = true;
+      },
+
+      async guardar() {
         if (!this.form.nombre || !this.form.presupuesto_diario) { this.errorMsg = 'Nombre y presupuesto son obligatorios'; return; }
         this.guardando = true; this.errorMsg = '';
-        const resp = await apiFetch('/campanas/', { method: 'POST', body: JSON.stringify(this.form) });
+        const id = this.form.id;
+        const body = { ...this.form };
+        delete body.id;
+        const url = id ? `/campanas/${id}` : '/campanas/';
+        const method = id ? 'PATCH' : 'POST';
+        const resp = await apiFetch(url, { method, body: JSON.stringify(body) });
         if (resp && resp.ok) {
           this.modal = false;
           await this.cargar();
         } else if (resp) {
           const err = await resp.json().catch(() => ({}));
-          this.errorMsg = Array.isArray(err.detail) ? err.detail.map(e => e.msg).join('; ') : (err.detail || 'Error al crear');
+          this.errorMsg = Array.isArray(err.detail) ? err.detail.map(e => e.msg).join('; ') : (err.detail || 'Error al guardar');
         }
         this.guardando = false;
+      },
+
+      async eliminar(id, nombre) {
+        if (!confirm(`¿Eliminar la campaña "${nombre}"? Si está activa en Meta, deberías pausarla primero.`)) return;
+        const resp = await apiFetch('/campanas/' + id, { method: 'DELETE' });
+        if (resp && resp.ok) await this.cargar();
       },
 
       async lanzar(id) {
