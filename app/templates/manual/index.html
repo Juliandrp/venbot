@@ -1,0 +1,506 @@
+{% extends "base.html" %}
+{% block title %}Manual de Usuario{% endblock %}
+{% block page_title %}Manual de Usuario{% endblock %}
+
+{% block content %}
+<div x-data="{ seccion: 'inicio', menuMobile: false }" class="flex gap-6">
+
+  <!-- TOC sidebar -->
+  <aside class="hidden lg:block w-64 flex-shrink-0">
+    <nav class="sticky top-6 space-y-1 text-sm">
+      {% set capitulos = [
+        ('inicio', '🚀', 'Bienvenida'),
+        ('configuracion', '⚙️', 'Configuración inicial'),
+        ('productos', '📦', 'Gestionar productos'),
+        ('pipeline-ia', '🤖', 'Pipeline de IA'),
+        ('campanas', '📣', 'Campañas Meta Ads'),
+        ('bot', '💬', 'Bot de ventas'),
+        ('pedidos', '🛒', 'Pedidos'),
+        ('clientes', '👥', 'Clientes'),
+        ('plan', '💳', 'Mi plan y límites'),
+        ('faq', '❓', 'Preguntas frecuentes'),
+      ] %}
+      {% for id, icon, label in capitulos %}
+      <a :href="'#{{ id }}'"
+         @click="seccion='{{ id }}'"
+         :class="seccion==='{{ id }}' ? 'bg-indigo-600/20 text-indigo-300 border-l-2 border-indigo-500' : 'text-gray-400 hover:bg-gray-800 hover:text-white'"
+         class="flex items-center gap-2 px-3 py-2 rounded-lg transition-colors text-sm">
+        <span>{{ icon }}</span>
+        <span>{{ label }}</span>
+      </a>
+      {% endfor %}
+    </nav>
+  </aside>
+
+  <!-- Contenido -->
+  <div class="flex-1 max-w-4xl space-y-12 pb-16">
+
+    <!-- ── 1. Bienvenida ─────────────────────────────────────────── -->
+    <section id="inicio" class="scroll-mt-6">
+      <div class="bg-gradient-to-br from-indigo-900/40 to-purple-900/40 border border-indigo-700/50 rounded-2xl p-8">
+        <h2 class="text-3xl font-bold text-white mb-2">Bienvenida a Venbot</h2>
+        <p class="text-gray-300 text-lg">Tu plataforma de e-commerce automatizado con IA</p>
+      </div>
+
+      <div class="prose-venbot mt-6 space-y-4 text-gray-300">
+        <p>
+          Venbot es una plataforma <strong>multi-tenant</strong> que automatiza la venta de productos en LATAM
+          combinando IA generativa, anuncios pagados y un bot de WhatsApp. Tú subes la foto de un producto
+          y Venbot:
+        </p>
+        <ul class="space-y-2 ml-4">
+          <li class="flex gap-3"><span class="text-indigo-400">→</span> Genera el copy de venta, SEO y guion de video con IA</li>
+          <li class="flex gap-3"><span class="text-indigo-400">→</span> Crea imágenes publicitarias en distintos estilos</li>
+          <li class="flex gap-3"><span class="text-indigo-400">→</span> Lanza campañas en Meta Ads segmentadas por edad y género</li>
+          <li class="flex gap-3"><span class="text-indigo-400">→</span> Atiende a los clientes en WhatsApp 24/7 y cierra ventas</li>
+          <li class="flex gap-3"><span class="text-indigo-400">→</span> Notifica al cliente en cada paso del envío</li>
+        </ul>
+
+        <h3 class="text-xl font-semibold text-white mt-8 mb-3">Tus primeros 5 minutos</h3>
+        <ol class="space-y-3 ml-4 list-decimal">
+          <li><a href="#configuracion" class="text-indigo-400 hover:text-indigo-300">Configura tu API key de Gemini</a> (gratis) o Claude/OpenAI</li>
+          <li><a href="#productos" class="text-indigo-400 hover:text-indigo-300">Crea tu primer producto</a> con foto y descripción</li>
+          <li>Espera 1-3 minutos a que la IA genere todo el contenido</li>
+          <li><a href="#campanas" class="text-indigo-400 hover:text-indigo-300">Lanza tu primera campaña</a> (opcional, requiere Meta Ads configurado)</li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- ── 2. Configuración ─────────────────────────────────────────── -->
+    <section id="configuracion" class="scroll-mt-6">
+      <h2 class="text-2xl font-bold text-white mb-2">⚙️ Configuración inicial</h2>
+      <p class="text-gray-400 mb-6">Lo que tienes que poner antes de usar la app.</p>
+
+      <div class="space-y-6">
+
+        <!-- IA -->
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+          <h3 class="text-lg font-semibold text-white mb-3">🧠 Proveedor de IA</h3>
+          <p class="text-gray-400 text-sm mb-4">
+            Venbot funciona con tres proveedores. Elige uno según tu presupuesto:
+          </p>
+          <div class="grid md:grid-cols-3 gap-3">
+            <div class="bg-gray-800 border border-green-700/50 rounded-xl p-4">
+              <div class="text-green-400 font-semibold text-sm">✨ Gemini</div>
+              <p class="text-xs text-gray-400 mt-1">Gratis hasta cierto uso. Recomendado para empezar.</p>
+              <p class="text-xs text-gray-500 mt-2">Key en <a href="https://aistudio.google.com/" target="_blank" class="text-indigo-400">aistudio.google.com</a></p>
+            </div>
+            <div class="bg-gray-800 border border-gray-700 rounded-xl p-4">
+              <div class="text-purple-400 font-semibold text-sm">🔮 Claude</div>
+              <p class="text-xs text-gray-400 mt-1">Mejor calidad de texto. Pago por uso.</p>
+              <p class="text-xs text-gray-500 mt-2">Key en <a href="https://console.anthropic.com/" target="_blank" class="text-indigo-400">console.anthropic.com</a></p>
+            </div>
+            <div class="bg-gray-800 border border-gray-700 rounded-xl p-4">
+              <div class="text-blue-400 font-semibold text-sm">🤖 ChatGPT</div>
+              <p class="text-xs text-gray-400 mt-1">Soporta DALL-E para imágenes pagas.</p>
+              <p class="text-xs text-gray-500 mt-2">Key en <a href="https://platform.openai.com/" target="_blank" class="text-indigo-400">platform.openai.com</a></p>
+            </div>
+          </div>
+          <div class="mt-4 px-4 py-3 bg-indigo-900/20 border border-indigo-800/50 rounded-lg text-xs text-gray-300">
+            <strong class="text-indigo-300">Pasos:</strong> Sidebar → <strong>Configuración</strong> → sección <em>Inteligencia Artificial</em> → escoge proveedor → pega tu key → escoge modelo del dropdown → <strong>Guardar</strong>.
+          </div>
+        </div>
+
+        <!-- Video -->
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+          <h3 class="text-lg font-semibold text-white mb-3">🎬 Generación de video (opcional)</h3>
+          <p class="text-gray-400 text-sm mb-3">
+            Si quieres que cada producto tenga un video promocional automático:
+          </p>
+          <ul class="space-y-2 text-sm text-gray-300">
+            <li><strong class="text-white">Kling AI</strong> — recomendado, video cinemático con tu producto. <a href="https://klingai.com" target="_blank" class="text-indigo-400">klingai.com</a></li>
+            <li><strong class="text-white">Higgsfield</strong> — movimiento de cámara más artístico. <a href="https://higgsfield.ai" target="_blank" class="text-indigo-400">higgsfield.ai</a></li>
+            <li><strong class="text-white">HeyGen</strong> — videos con avatar humano hablando. <a href="https://heygen.com" target="_blank" class="text-indigo-400">heygen.com</a></li>
+          </ul>
+          <p class="text-xs text-gray-500 mt-3">Si no configuras ninguno, los productos se generan sin video (solo texto + imágenes).</p>
+        </div>
+
+        <!-- Shopify -->
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+          <h3 class="text-lg font-semibold text-white mb-3">🛍️ Shopify (opcional)</h3>
+          <p class="text-gray-400 text-sm mb-3">
+            Si tienes una tienda Shopify, Venbot publicará automáticamente cada producto generado.
+          </p>
+          <ol class="text-sm text-gray-300 space-y-1 list-decimal ml-4">
+            <li>Ve a tu admin Shopify → <em>Apps</em> → <em>Develop apps</em></li>
+            <li>Crea una app personalizada con scopes: <code class="text-indigo-400">write_products, write_inventory</code></li>
+            <li>Copia el <strong>Access Token</strong> y la URL de tu tienda (sin <code>https://</code>)</li>
+            <li>Pégalo en Configuración → sección Shopify</li>
+          </ol>
+        </div>
+
+        <!-- WhatsApp -->
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+          <h3 class="text-lg font-semibold text-white mb-3">📱 WhatsApp Business (opcional, para el bot)</h3>
+          <p class="text-gray-400 text-sm mb-3">
+            Sin esto, el bot no recibe ni responde mensajes.
+          </p>
+          <ol class="text-sm text-gray-300 space-y-1 list-decimal ml-4">
+            <li>Ve a <a href="https://developers.facebook.com" target="_blank" class="text-indigo-400">developers.facebook.com</a> → tu app → WhatsApp</li>
+            <li>Pega tu <strong>Phone Number ID</strong> y <strong>Access Token</strong> en Configuración</li>
+            <li>En la sección <em>URLs de Webhooks</em>, copia la URL de WhatsApp</li>
+            <li>Pégala en Meta Developers → Configuration → Callback URL</li>
+            <li>Define un <strong>Verify Token</strong> en ambos lados (Meta y Venbot — debe ser el mismo)</li>
+            <li>Suscríbete al evento <code class="text-indigo-400">messages</code></li>
+          </ol>
+        </div>
+
+        <!-- Email -->
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+          <h3 class="text-lg font-semibold text-white mb-3">📧 Email SMTP (opcional)</h3>
+          <p class="text-gray-400 text-sm">
+            Necesario solo si quieres enviar correos automáticos a los clientes (confirmación de pedido, estado de envío).
+            Funciona con Gmail (con app password), SendGrid, Resend, Mailgun, etc.
+          </p>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ── 3. Productos ─────────────────────────────────────────── -->
+    <section id="productos" class="scroll-mt-6">
+      <h2 class="text-2xl font-bold text-white mb-2">📦 Gestionar productos</h2>
+      <p class="text-gray-400 mb-6">Cómo crear y administrar tus productos.</p>
+
+      <div class="space-y-5">
+
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+          <h3 class="text-lg font-semibold text-white mb-3">Crear un producto</h3>
+          <ol class="text-sm text-gray-300 space-y-2 list-decimal ml-4">
+            <li>Sidebar → <strong>Productos</strong> → botón <strong>+ Nuevo producto</strong></li>
+            <li><strong>Paso 1 (Datos):</strong> Nombre, descripción para la IA, precio, inventario.
+              La descripción es importante: dile a la IA qué tiene de especial el producto, a quién va dirigido, qué problema resuelve.</li>
+            <li><strong>Paso 2 (Fotos):</strong> Arrastra hasta 10 fotos del producto real. La IA las analiza para
+              generar contenido más preciso. Sin fotos también funciona, pero el resultado es más genérico.</li>
+            <li>Click en <strong>"Crear con mis fotos"</strong>. El producto aparece en la lista con la barra de progreso de IA.</li>
+          </ol>
+        </div>
+
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+          <h3 class="text-lg font-semibold text-white mb-3">¿Qué muestra cada estado?</h3>
+          <div class="space-y-2 text-sm">
+            <div class="flex items-center gap-3"><span class="px-2 py-0.5 bg-gray-800 text-gray-400 rounded text-xs">5%</span><span class="text-gray-300">En cola — esperando worker</span></div>
+            <div class="flex items-center gap-3"><span class="px-2 py-0.5 bg-indigo-900/50 text-indigo-300 rounded text-xs">25%</span><span class="text-gray-300">Generando copy de venta y guion</span></div>
+            <div class="flex items-center gap-3"><span class="px-2 py-0.5 bg-indigo-900/50 text-indigo-300 rounded text-xs">50%</span><span class="text-gray-300">Generando imágenes publicitarias</span></div>
+            <div class="flex items-center gap-3"><span class="px-2 py-0.5 bg-indigo-900/50 text-indigo-300 rounded text-xs">75%</span><span class="text-gray-300">Procesando video (si tienes Kling/Higgsfield)</span></div>
+            <div class="flex items-center gap-3"><span class="px-2 py-0.5 bg-indigo-900/50 text-indigo-300 rounded text-xs">90%</span><span class="text-gray-300">Publicando en Shopify (si está configurado)</span></div>
+            <div class="flex items-center gap-3"><span class="px-2 py-0.5 bg-green-900/50 text-green-400 rounded text-xs">✓ Completo</span><span class="text-gray-300">Listo para lanzar campaña</span></div>
+          </div>
+        </div>
+
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+          <h3 class="text-lg font-semibold text-white mb-3">Ver el detalle del producto</h3>
+          <p class="text-sm text-gray-300 mb-2">
+            Click en <strong>"Ver detalle"</strong> en la fila del producto. Verás:
+          </p>
+          <ul class="text-sm text-gray-300 space-y-1 ml-4 list-disc">
+            <li>Título SEO optimizado para Google</li>
+            <li>Descripción persuasiva (150-200 palabras)</li>
+            <li>5 bullet points de beneficios</li>
+            <li><strong>21 variantes de copy</strong> (4 grupos de edad × M/F/todos) listas para anuncios</li>
+            <li>Imágenes generadas (galería)</li>
+            <li>Video promocional (si aplica)</li>
+            <li>Guion de video</li>
+          </ul>
+          <p class="text-xs text-gray-500 mt-3">Si algo quedó mal, puedes regenerar todo el contenido con un click.</p>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ── 4. Pipeline IA ─────────────────────────────────────────── -->
+    <section id="pipeline-ia" class="scroll-mt-6">
+      <h2 class="text-2xl font-bold text-white mb-2">🤖 Pipeline de IA — qué genera y cuánto cuesta</h2>
+      <p class="text-gray-400 mb-6">El flujo completo cuando creas un producto.</p>
+
+      <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 mb-5">
+        <table class="w-full text-sm">
+          <thead class="text-xs text-gray-500 uppercase">
+            <tr class="border-b border-gray-800">
+              <th class="text-left py-2">Paso</th>
+              <th class="text-left py-2">Proveedor (gratis)</th>
+              <th class="text-left py-2">Proveedor (pago)</th>
+              <th class="text-left py-2">Tiempo</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-800">
+            <tr>
+              <td class="py-3 text-white">Texto (copy + SEO + guion)</td>
+              <td class="text-green-400">Gemini 2.5 Flash</td>
+              <td class="text-gray-400">Claude / GPT-4o</td>
+              <td class="text-gray-400">~30s</td>
+            </tr>
+            <tr>
+              <td class="py-3 text-white">Imágenes (3 estilos)</td>
+              <td class="text-green-400">Pollinations Flux</td>
+              <td class="text-gray-400">Imagen 3 / DALL-E 3</td>
+              <td class="text-gray-400">~60s</td>
+            </tr>
+            <tr>
+              <td class="py-3 text-white">Video (5-10 seg)</td>
+              <td class="text-gray-600">— (omitido)</td>
+              <td class="text-gray-400">Kling / Higgsfield / HeyGen</td>
+              <td class="text-gray-400">2-5 min</td>
+            </tr>
+            <tr>
+              <td class="py-3 text-white">Publicación Shopify</td>
+              <td class="text-gray-600">N/A</td>
+              <td class="text-gray-400">Shopify API</td>
+              <td class="text-gray-400">~5s</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="bg-yellow-900/20 border border-yellow-700/50 rounded-2xl p-5">
+        <h4 class="font-semibold text-yellow-200 mb-2">💡 Estrategia recomendada para empezar</h4>
+        <p class="text-sm text-gray-300">
+          Usa solo <strong>Gemini + Pollinations</strong> en tus primeros productos. Es 100% gratis.
+          Cuando valides que un producto vende, mejora ese específico subiendo a <strong>Imagen 3</strong> para
+          imágenes más realistas y agregando <strong>Kling</strong> para video.
+        </p>
+      </div>
+    </section>
+
+    <!-- ── 5. Campañas ─────────────────────────────────────────── -->
+    <section id="campanas" class="scroll-mt-6">
+      <h2 class="text-2xl font-bold text-white mb-2">📣 Campañas Meta Ads</h2>
+      <p class="text-gray-400 mb-6">Cómo lanzar y administrar anuncios en Facebook e Instagram.</p>
+
+      <div class="space-y-5">
+
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+          <h3 class="text-lg font-semibold text-white mb-3">Crear una campaña</h3>
+          <ol class="text-sm text-gray-300 space-y-2 list-decimal ml-4">
+            <li>Sidebar → <strong>Campañas</strong> → <strong>+ Nueva campaña</strong></li>
+            <li>Nombre descriptivo (ej. "Licuadora — Verano 2026")</li>
+            <li>Selecciona el producto a promocionar (debe tener contenido IA generado)</li>
+            <li>Presupuesto diario en USD (mínimo $5 recomendado para Meta)</li>
+            <li>ROAS mínimo: si la campaña baja de este múltiplo, se auto-pausa cada 30 min</li>
+            <li>Fechas de inicio/fin (opcional)</li>
+          </ol>
+        </div>
+
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+          <h3 class="text-lg font-semibold text-white mb-3">Estados</h3>
+          <div class="grid md:grid-cols-2 gap-3 text-sm">
+            <div class="bg-gray-800 rounded-lg p-3"><span class="text-gray-400 font-semibold">Borrador</span> — creada pero no enviada a Meta. Editable libre.</div>
+            <div class="bg-gray-800 rounded-lg p-3"><span class="text-green-400 font-semibold">Activa</span> — corriendo en Meta. Los cambios se sincronizan al guardar.</div>
+            <div class="bg-gray-800 rounded-lg p-3"><span class="text-yellow-400 font-semibold">Pausada</span> — pausada en Meta. Reactívala cuando quieras.</div>
+            <div class="bg-gray-800 rounded-lg p-3"><span class="text-red-400 font-semibold">Error</span> — Meta rechazó algo. Revisa los logs del worker.</div>
+          </div>
+        </div>
+
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+          <h3 class="text-lg font-semibold text-white mb-3">Segmentación automática</h3>
+          <p class="text-sm text-gray-300 mb-2">
+            Venbot crea <strong>7 conjuntos de anuncios</strong> automáticamente, cada uno con su propio copy:
+          </p>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+            <div class="bg-gray-800 px-2 py-1.5 rounded text-center text-gray-400">18-24 M</div>
+            <div class="bg-gray-800 px-2 py-1.5 rounded text-center text-gray-400">18-24 F</div>
+            <div class="bg-gray-800 px-2 py-1.5 rounded text-center text-gray-400">25-34 M</div>
+            <div class="bg-gray-800 px-2 py-1.5 rounded text-center text-gray-400">25-34 F</div>
+            <div class="bg-gray-800 px-2 py-1.5 rounded text-center text-gray-400">35-44 M</div>
+            <div class="bg-gray-800 px-2 py-1.5 rounded text-center text-gray-400">35-44 F</div>
+            <div class="bg-gray-800 px-2 py-1.5 rounded text-center text-gray-400">45+</div>
+          </div>
+          <p class="text-xs text-gray-500 mt-3">Cada uno recibe 1/7 del presupuesto. Países por defecto: CO, MX, PE, EC.</p>
+        </div>
+
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+          <h3 class="text-lg font-semibold text-white mb-3">Auto-pausa por bajo ROAS</h3>
+          <p class="text-sm text-gray-300">
+            Cada 30 minutos, Venbot revisa todas las campañas activas. Si el ROAS de la campaña cae bajo
+            el mínimo que definiste, los AdSets que más están perdiendo se pausan automáticamente.
+            Esto protege tu presupuesto sin que tengas que estar pendiente.
+          </p>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ── 6. Bot ─────────────────────────────────────────── -->
+    <section id="bot" class="scroll-mt-6">
+      <h2 class="text-2xl font-bold text-white mb-2">💬 Bot de ventas</h2>
+      <p class="text-gray-400 mb-6">Cómo funciona y cómo intervenir cuando hace falta.</p>
+
+      <div class="space-y-5">
+
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+          <h3 class="text-lg font-semibold text-white mb-3">Flujo automático</h3>
+          <ol class="text-sm text-gray-300 space-y-2 list-decimal ml-4">
+            <li>Cliente ve un anuncio Meta y escribe a tu WhatsApp</li>
+            <li>Venbot procesa el mensaje con la IA (Claude/Gemini) usando el contexto del producto</li>
+            <li>Genera respuesta en español natural y la envía</li>
+            <li>Si la confianza es alta (>50%), sigue conversando solo</li>
+            <li>Si baja (objeciones complejas, queja, devolución), <strong>transfiere a humano</strong> y aparece un aviso amarillo en la conversación</li>
+            <li>Cuando el cliente confirma compra, el bot pide datos de envío y crea el pedido</li>
+          </ol>
+        </div>
+
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+          <h3 class="text-lg font-semibold text-white mb-3">Responder manualmente</h3>
+          <p class="text-sm text-gray-300 mb-2">
+            Sidebar → <strong>Bot de Ventas</strong> → click en una conversación → escribe en el campo de abajo
+            → <strong>Enter</strong> para enviar (Shift+Enter para nueva línea).
+          </p>
+          <p class="text-xs text-gray-500">
+            Apenas envías un mensaje, la conversación pasa a estado <em>transferida</em> — el bot no intervendrá más
+            hasta que cierres la conversación o vuelvas a marcarla como activa.
+          </p>
+        </div>
+
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+          <h3 class="text-lg font-semibold text-white mb-3">Estados de conversación</h3>
+          <div class="space-y-2 text-sm">
+            <div class="flex gap-2"><span class="text-green-400 font-semibold w-24">Activa</span><span class="text-gray-300">El bot responde automáticamente</span></div>
+            <div class="flex gap-2"><span class="text-yellow-400 font-semibold w-24">Transferida</span><span class="text-gray-300">Esperando respuesta humana, el bot ya no responde</span></div>
+            <div class="flex gap-2"><span class="text-gray-400 font-semibold w-24">Cerrada</span><span class="text-gray-300">Conversación archivada</span></div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ── 7. Pedidos ─────────────────────────────────────────── -->
+    <section id="pedidos" class="scroll-mt-6">
+      <h2 class="text-2xl font-bold text-white mb-2">🛒 Pedidos</h2>
+      <p class="text-gray-400 mb-6">Gestionar el ciclo de vida de cada venta.</p>
+
+      <div class="space-y-5">
+
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+          <h3 class="text-lg font-semibold text-white mb-3">Estados</h3>
+          <div class="grid md:grid-cols-2 gap-2 text-sm">
+            <div class="bg-gray-800 rounded p-2"><span class="text-gray-400">⏳ Pendiente</span> — recién creado por el bot</div>
+            <div class="bg-gray-800 rounded p-2"><span class="text-yellow-400">✓ Confirmado</span> — pago verificado, listo para envío</div>
+            <div class="bg-gray-800 rounded p-2"><span class="text-blue-400">📦 Enviado</span> — entregado a transportadora</div>
+            <div class="bg-gray-800 rounded p-2"><span class="text-blue-400">🚚 En camino</span> — rastreo activo</div>
+            <div class="bg-gray-800 rounded p-2"><span class="text-green-400">🎉 Entregado</span> — cliente lo recibió</div>
+            <div class="bg-gray-800 rounded p-2"><span class="text-red-400">❌ Fallido / Cancelado</span> — algo salió mal</div>
+          </div>
+        </div>
+
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+          <h3 class="text-lg font-semibold text-white mb-3">Cambiar estado y notificar</h3>
+          <ol class="text-sm text-gray-300 space-y-1 list-decimal ml-4">
+            <li>Sidebar → <strong>Pedidos</strong></li>
+            <li>Click en <strong>"Cambiar estado"</strong></li>
+            <li>Escoge nuevo estado, número de seguimiento y transportadora si aplica</li>
+            <li>Marca <strong>"Notificar al cliente"</strong> (default: sí)</li>
+            <li>Guardar — el cliente recibe automáticamente WhatsApp + email</li>
+          </ol>
+        </div>
+
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+          <h3 class="text-lg font-semibold text-white mb-3">Rastreo automático con Dropi</h3>
+          <p class="text-sm text-gray-300">
+            Si tienes Dropi configurado, cada 2 horas Venbot consulta el estado de los envíos
+            activos y notifica al cliente automáticamente sin que tengas que tocar nada.
+          </p>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ── 8. Clientes ─────────────────────────────────────────── -->
+    <section id="clientes" class="scroll-mt-6">
+      <h2 class="text-2xl font-bold text-white mb-2">👥 Clientes</h2>
+      <p class="text-gray-400 mb-6">Tu CRM básico integrado.</p>
+
+      <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-3 text-sm text-gray-300">
+        <p>Los clientes se crean <strong>automáticamente</strong> cuando:</p>
+        <ul class="ml-4 space-y-1 list-disc">
+          <li>Alguien escribe a tu WhatsApp por primera vez</li>
+          <li>Cierras una venta por el bot</li>
+          <li>Los agregas manualmente desde la vista de Clientes</li>
+        </ul>
+        <p>De cada cliente ves: <strong>total de pedidos</strong> y <strong>total gastado</strong>.
+          Útil para identificar tus mejores clientes y enfocarte en retenerlos.</p>
+        <p class="text-xs text-gray-500">Buscador en tiempo real por nombre, email, teléfono o WhatsApp.</p>
+      </div>
+    </section>
+
+    <!-- ── 9. Plan ─────────────────────────────────────────── -->
+    <section id="plan" class="scroll-mt-6">
+      <h2 class="text-2xl font-bold text-white mb-2">💳 Mi plan y límites</h2>
+      <p class="text-gray-400 mb-6">Cuánto consumes y cómo cambiar de plan.</p>
+
+      <div class="space-y-5">
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+          <h3 class="text-lg font-semibold text-white mb-3">Lo que mide tu plan</h3>
+          <ul class="text-sm text-gray-300 space-y-1 ml-4 list-disc">
+            <li><strong>Productos creados</strong> — cuántos productos activos puedes tener</li>
+            <li><strong>Campañas activas</strong> — cuántas campañas puedes tener corriendo a la vez</li>
+            <li><strong>Mensajes bot/mes</strong> — cuántos mensajes responde el bot al mes</li>
+          </ul>
+        </div>
+
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+          <h3 class="text-lg font-semibold text-white mb-3">Ver tu uso en tiempo real</h3>
+          <p class="text-sm text-gray-300">
+            Sidebar → <strong>Mi Plan</strong> → barras de progreso por cada métrica.
+            Verde si vas bien, amarillo cerca del límite, rojo si lo excediste.
+          </p>
+        </div>
+
+        <div class="bg-yellow-900/20 border border-yellow-700/50 rounded-2xl p-5">
+          <p class="text-sm text-yellow-100">
+            <strong>Cuando excedes un límite:</strong> el endpoint correspondiente devuelve
+            <code class="bg-gray-900 px-1.5 py-0.5 rounded text-xs">402 Payment Required</code> con
+            un mensaje claro pidiéndote subir de plan. Tus datos siguen seguros, solo no puedes
+            crear nuevos hasta liberar espacio o actualizar.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 10. FAQ ─────────────────────────────────────────── -->
+    <section id="faq" class="scroll-mt-6">
+      <h2 class="text-2xl font-bold text-white mb-2">❓ Preguntas frecuentes</h2>
+
+      <div class="space-y-3" x-data="{ abierto: null }">
+        {% set preguntas = [
+          ('¿Por qué mi producto se queda en "En cola..." más de 5 minutos?',
+           'Probablemente el worker Celery no está procesando tareas. Causas comunes: (1) tu API key de IA es inválida o expiró, (2) excedió rate limit del proveedor (Gemini free tiene límite por minuto), (3) falló la conexión a Redis. Revisa los logs del contenedor o reinstala tu API key.'),
+          ('La barra de progreso muestra 25% pero no avanza',
+           'El paso 1 (texto) se completó pero el paso 2 (imágenes) falló. Si usas Pollinations gratis, a veces el servicio se cae unos minutos. Espera 5 min e intenta regenerar el contenido desde el detalle del producto.'),
+          ('No me genera video aunque configuré Kling',
+           'Verifica que (1) tu key de Kling sea válida, (2) tu producto tenga al menos una foto subida — Kling necesita una imagen de referencia, (3) el guion del video no esté vacío. Los videos tardan 2-5 min, paciencia.'),
+          ('La campaña Meta dice "error"',
+           'Click en la campaña, revisa el detalle. Causas típicas: (1) tu Ad Account no tiene método de pago activo, (2) Meta rechazó las imágenes por políticas, (3) el píxel no está configurado. Meta es estricto con primer lanzamiento — usa anuncios genéricos al inicio.'),
+          ('El bot responde con cosas sin sentido',
+           'Probablemente el modelo IA no tiene suficiente contexto del producto. Asegúrate de que el producto tenga descripción detallada (no solo el nombre) y que el contenido IA esté generado. El bot usa el guion del video como contexto principal.'),
+          ('¿Qué pasa con mis datos si dejo de pagar?',
+           'Tu cuenta queda en estado "suspendida" — no puedes crear cosas nuevas pero los datos siguen ahí. Después de 90 días sin actividad se eliminan permanentemente. Backup de tus pedidos es tu responsabilidad (export desde la lista de pedidos).'),
+          ('¿Cómo respondo más rápido en el bot cuando hay muchas conversaciones?',
+           'Por ahora hay que hacerlo una a una. En próximas versiones agregaremos templates de respuesta rápida y autoasignación a agentes.'),
+          ('¿Puedo usar mi propio dominio en vez de almabot.matriz.cloud?',
+           'Sí. En el panel admin → tu app → Domains. Agrega tu dominio (ej. tienda.midominio.com) y apunta el DNS A al IP del servidor. Coolify emite el cert SSL automático.'),
+        ] %}
+        {% for q, a in preguntas %}
+        <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+          <button @click="abierto === {{ loop.index }} ? abierto = null : abierto = {{ loop.index }}"
+                  class="w-full px-5 py-4 flex items-center justify-between text-left hover:bg-gray-800/50 transition-colors">
+            <span class="text-sm text-white font-medium">{{ q }}</span>
+            <span class="text-gray-500 text-lg" x-text="abierto === {{ loop.index }} ? '−' : '+'"></span>
+          </button>
+          <div x-show="abierto === {{ loop.index }}" x-collapse class="px-5 pb-4 text-sm text-gray-400 leading-relaxed">
+            {{ a }}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <div class="mt-8 bg-gradient-to-br from-indigo-900/30 to-purple-900/30 border border-indigo-700/50 rounded-2xl p-6 text-center">
+        <p class="text-gray-300 mb-2">¿No encontraste lo que buscabas?</p>
+        <p class="text-sm text-gray-400">El manual técnico está en
+          <a href="https://github.com/Juliandrp/venbot/tree/main/docs" target="_blank" class="text-indigo-400 hover:text-indigo-300">github.com/Juliandrp/venbot/docs</a>
+        </p>
+      </div>
+    </section>
+
+  </div>
+</div>
+{% endblock %}
