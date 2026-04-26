@@ -19,7 +19,7 @@ from sqlalchemy import inspect, text
 
 # Última revisión de Alembic conocida. Sincronizar con el archivo más reciente
 # en alembic/versions/ (ej. "0002_higgsfield_key.py" → "0002").
-LATEST_REVISION = "0003"
+LATEST_REVISION = "0004"
 
 
 async def init_database():

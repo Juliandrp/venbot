@@ -3,14 +3,23 @@
 {% block page_title %}📦 Productos{% endblock %}
 
 {% block topbar_actions %}
-<button @click="$dispatch('abrir-modal-producto')"
-        class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition-colors">
-  + Nuevo producto
-</button>
+<div class="flex items-center gap-2">
+  <button @click="$dispatch('abrir-modal-dropi')"
+          class="px-4 py-2 bg-gray-800 hover:bg-orange-700 text-gray-300 hover:text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2">
+    <span>📥</span>
+    <span>Importar de Dropi</span>
+  </button>
+  <button @click="$dispatch('abrir-modal-producto')"
+          class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition-colors">
+    + Nuevo producto
+  </button>
+</div>
 {% endblock %}
 
 {% block content %}
-<div x-data="productos()" x-init="iniciar()" @abrir-modal-producto.window="abrirModal()">
+<div x-data="productos()" x-init="iniciar()"
+     @abrir-modal-producto.window="abrirModal()"
+     @abrir-modal-dropi.window="abrirModalDropi()">
 
   <!-- Modal nuevo producto -->
   <div x-show="modalNuevo" x-cloak
@@ -140,6 +149,88 @@
     </div>
   </div>
 
+  <!-- Modal: Importar de Dropi -->
+  <div x-show="modalDropi" x-cloak
+       class="fixed inset-0 bg-black/70 flex items-start justify-center z-50 p-4 overflow-y-auto"
+       @click.self="modalDropi = false">
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-4xl my-8">
+      <div class="flex items-center justify-between mb-5">
+        <div>
+          <h2 class="text-xl font-bold text-white">Importar productos desde Dropi</h2>
+          <p class="text-sm text-gray-400 mt-1">Trae nombre, precio, fotos y descripción. Opcionalmente genera contenido IA al importar.</p>
+        </div>
+        <button @click="modalDropi = false" class="text-gray-500 hover:text-white text-2xl leading-none">&times;</button>
+      </div>
+
+      <!-- Buscador + filtros -->
+      <div class="flex gap-2 mb-4">
+        <input type="text" x-model="dropiBusqueda" @input.debounce.500="cargarDropi()"
+               placeholder="Buscar producto en Dropi..."
+               class="flex-1 px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 text-sm" />
+        <button @click="cargarDropi()" :disabled="cargandoDropi"
+                class="px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl text-sm disabled:opacity-50">
+          🔄 Refrescar
+        </button>
+      </div>
+
+      <!-- Loading / error -->
+      <div x-show="cargandoDropi" class="py-12 text-center text-gray-500 text-sm">Cargando catálogo de Dropi...</div>
+      <div x-show="errorDropi" class="my-4 px-4 py-3 bg-red-900/40 border border-red-800 text-red-300 rounded-lg text-sm" x-text="errorDropi"></div>
+
+      <!-- Vacío -->
+      <div x-show="!cargandoDropi && !errorDropi && productosDropi.length === 0" class="py-12 text-center text-gray-500 text-sm">
+        No hay productos disponibles en tu Dropi (o el buscador no encontró nada).
+      </div>
+
+      <!-- Lista con checkboxes -->
+      <div x-show="!cargandoDropi && productosDropi.length > 0" class="space-y-2 max-h-[420px] overflow-y-auto pr-2">
+        <template x-for="p in productosDropi" :key="p.id">
+          <label :class="p.ya_importado ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-800'"
+                 class="flex items-center gap-3 p-3 bg-gray-800/50 border border-gray-700 rounded-xl transition-colors">
+            <input type="checkbox"
+                   :value="p.id"
+                   :checked="seleccionDropi.includes(p.id)"
+                   :disabled="p.ya_importado"
+                   @change="toggleSeleccionDropi(p.id)"
+                   class="w-5 h-5 rounded" />
+            <img :src="p.imagen || '/static/img/placeholder.png'"
+                 onerror="this.style.visibility='hidden'"
+                 class="w-14 h-14 object-cover rounded-lg flex-shrink-0 bg-gray-700" />
+            <div class="flex-1 min-w-0">
+              <p class="font-medium text-white text-sm truncate" x-text="p.nombre"></p>
+              <p class="text-xs text-gray-500 truncate" x-text="p.descripcion || 'Sin descripción'"></p>
+              <div class="flex items-center gap-3 mt-1 text-xs">
+                <span class="text-green-400 font-medium" x-text="p.precio ? '$' + p.precio.toLocaleString('es-CO') : 'Sin precio'"></span>
+                <span class="text-gray-500" x-text="'Stock: ' + p.inventario"></span>
+                <span x-show="p.sku" class="text-gray-600 font-mono" x-text="'SKU: ' + p.sku"></span>
+                <span x-show="p.ya_importado" class="text-yellow-500 font-medium">✓ Ya importado</span>
+              </div>
+            </div>
+          </label>
+        </template>
+      </div>
+
+      <!-- Resultado de importación -->
+      <div x-show="resultadoDropi" class="mt-4 px-4 py-3 bg-green-900/30 border border-green-700 rounded-lg text-sm text-green-200">
+        <p x-text="resultadoDropi"></p>
+      </div>
+
+      <!-- Footer con acciones -->
+      <div class="mt-5 pt-5 border-t border-gray-800 flex items-center justify-between gap-4">
+        <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+          <input type="checkbox" x-model="dropiGenerarContenido" class="w-4 h-4 rounded" />
+          Generar contenido IA después de importar (recomendado)
+        </label>
+        <div class="flex items-center gap-2">
+          <span class="text-sm text-gray-400" x-text="seleccionDropi.length + ' seleccionados'"></span>
+          <button @click="importarDropi()" :disabled="importandoDropi || seleccionDropi.length === 0"
+                  class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                  x-text="importandoDropi ? 'Importando...' : 'Importar seleccionados'"></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Lista de productos -->
   <div class="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
     <div class="px-6 py-4 border-b border-gray-800">
@@ -224,8 +315,79 @@
       _refreshTimer: null,
       form: { nombre: '', descripcion_input: '', precio: '', inventario: 0 },
 
+      // Importar de Dropi
+      modalDropi: false,
+      productosDropi: [],
+      seleccionDropi: [],
+      cargandoDropi: false,
+      importandoDropi: false,
+      errorDropi: '',
+      resultadoDropi: '',
+      dropiBusqueda: '',
+      dropiGenerarContenido: true,
+
       iniciar() {
         this.cargar();
+      },
+
+      async abrirModalDropi() {
+        this.modalDropi = true;
+        this.seleccionDropi = [];
+        this.resultadoDropi = '';
+        this.errorDropi = '';
+        await this.cargarDropi();
+      },
+
+      async cargarDropi() {
+        this.cargandoDropi = true;
+        this.errorDropi = '';
+        try {
+          const url = '/productos/dropi/disponibles' + (this.dropiBusqueda ? '?search=' + encodeURIComponent(this.dropiBusqueda) : '');
+          const resp = await apiFetch(url);
+          if (resp && resp.ok) {
+            const data = await resp.json();
+            this.productosDropi = data.items || [];
+          } else if (resp) {
+            const err = await resp.json().catch(() => ({}));
+            this.errorDropi = err.detail || 'Error al consultar Dropi';
+          }
+        } finally {
+          this.cargandoDropi = false;
+        }
+      },
+
+      toggleSeleccionDropi(id) {
+        const i = this.seleccionDropi.indexOf(id);
+        if (i >= 0) this.seleccionDropi.splice(i, 1);
+        else this.seleccionDropi.push(id);
+      },
+
+      async importarDropi() {
+        if (this.seleccionDropi.length === 0 || this.importandoDropi) return;
+        this.importandoDropi = true;
+        this.resultadoDropi = '';
+        this.errorDropi = '';
+        const resp = await apiFetch('/productos/dropi/importar', {
+          method: 'POST',
+          body: JSON.stringify({
+            dropi_ids: this.seleccionDropi,
+            generar_contenido: this.dropiGenerarContenido,
+          }),
+        });
+        if (resp && resp.ok) {
+          const r = await resp.json();
+          this.resultadoDropi = `Importados: ${r.importados} | Saltados: ${r.saltados} | Errores: ${r.errores}`;
+          this.seleccionDropi = [];
+          await this.cargarDropi();   // refresca el listado para marcar los nuevos como "ya importado"
+          await this.cargar();         // refresca la lista principal de productos
+          if (r.importados > 0 && r.errores === 0) {
+            setTimeout(() => { this.modalDropi = false; }, 1500);
+          }
+        } else if (resp) {
+          const err = await resp.json().catch(() => ({}));
+          this.errorDropi = err.detail || 'Error al importar';
+        }
+        this.importandoDropi = false;
       },
 
       _programarRefresh() {
