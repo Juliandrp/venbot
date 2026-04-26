@@ -117,3 +117,56 @@ class MetaAdsService:
                 params=self._params({"status": "PAUSED"}),
             )
             resp.raise_for_status()
+
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
+    async def actualizar_campana(self, campana, db) -> dict:
+        """
+        Sincroniza cambios de la campaña local con Meta:
+          - Renombra la campaña si cambió el nombre
+          - Reparte el nuevo presupuesto entre los AdSets activos
+          - Aplica nueva fecha_fin si fue editada
+
+        Retorna {"campana_actualizada": bool, "adsets_actualizados": int}.
+        """
+        from sqlalchemy import select
+        from app.models.campaign import AdSet
+
+        actualizado_campana = False
+        actualizados_adsets = 0
+
+        # 1. Renombrar campaña en Meta
+        if campana.meta_campaign_id:
+            async with httpx.AsyncClient(timeout=20) as client:
+                resp = await client.post(
+                    f"{META_GRAPH}/{campana.meta_campaign_id}",
+                    params=self._params({"name": campana.nombre}),
+                )
+                if resp.status_code < 400:
+                    actualizado_campana = True
+
+        # 2. Repartir presupuesto entre AdSets activos
+        result = await db.execute(
+            select(AdSet).where(
+                AdSet.campaign_id == campana.id,
+                AdSet.activo == True,
+                AdSet.meta_adset_id.isnot(None),
+            )
+        )
+        adsets = list(result.scalars().all())
+        if adsets and campana.presupuesto_diario:
+            # Meta usa centavos
+            por_adset_centavos = max(100, int(float(campana.presupuesto_diario) / len(adsets) * 100))
+            for ads in adsets:
+                payload = {"daily_budget": por_adset_centavos}
+                # Si hay fecha_fin, aplicarla a cada AdSet (Meta espera Unix timestamp)
+                if campana.fecha_fin:
+                    payload["end_time"] = int(campana.fecha_fin.timestamp())
+                async with httpx.AsyncClient(timeout=20) as client:
+                    resp = await client.post(
+                        f"{META_GRAPH}/{ads.meta_adset_id}",
+                        params=self._params(payload),
+                    )
+                    if resp.status_code < 400:
+                        actualizados_adsets += 1
+
+        return {"campana_actualizada": actualizado_campana, "adsets_actualizados": actualizados_adsets}

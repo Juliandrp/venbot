@@ -109,10 +109,13 @@
        class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
        @click.self="modal = false">
     <div class="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-lg shadow-2xl">
-      <div class="flex items-center justify-between mb-6">
+      <div class="flex items-center justify-between mb-2">
         <h3 class="text-lg font-semibold text-white" x-text="form.id ? 'Editar campaña' : 'Nueva campaña Meta Ads'"></h3>
         <button @click="modal = false" class="text-gray-500 hover:text-white text-xl leading-none">&times;</button>
       </div>
+      <p x-show="form.id && editandoActiva" class="text-xs text-yellow-400 mb-4 bg-yellow-900/20 border border-yellow-800/50 rounded-lg px-3 py-2">
+        Esta campaña ya está activa en Meta. Los cambios de nombre, presupuesto y fecha de fin se sincronizarán automáticamente.
+      </p>
 
       <div class="space-y-4">
         <div>
@@ -189,6 +192,7 @@
       items: [], productos: [], cargando: true,
       modal: false, guardando: false, errorMsg: '',
       form: FORM_VACIO(),
+      editandoActiva: false,
 
       async cargar() {
         const resp = await apiFetch('/campanas/');
@@ -210,12 +214,14 @@
       async abrirModal() {
         this.errorMsg = '';
         this.form = FORM_VACIO();
+        this.editandoActiva = false;
         await this._cargarProductos();
         this.modal = true;
       },
 
       async editar(c) {
         this.errorMsg = '';
+        this.editandoActiva = c.estado === 'activa' && !!c.meta_campaign_id;
         await this._cargarProductos();
         // Recortar fechas a YYYY-MM-DD para input[type=date]
         const fmt = d => d ? d.substring(0, 10) : '';
