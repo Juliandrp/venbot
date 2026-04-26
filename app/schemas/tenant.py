@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 from app.models.tenant import PlanStatus
 
 
@@ -58,6 +58,15 @@ class TenantConfigIn(BaseModel):
     kling_api_key: str | None = None
     heygen_api_key: str | None = None
     higgsfield_api_key: str | None = None
+
+    @field_validator("smtp_port", mode="before")
+    @classmethod
+    def _empty_string_to_none_port(cls, v):
+        # El frontend envía "" cuando el campo está vacío — Pydantic no lo
+        # parsea como int. Lo convertimos a None.
+        if v == "" or v is None:
+            return None
+        return v
 
 
 class TenantConfigOut(BaseModel):

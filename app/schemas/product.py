@@ -1,6 +1,13 @@
 import uuid
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
+
+
+def _empty_to_none(v):
+    """Convierte string vacío a None — el frontend envía '' cuando el campo está vacío."""
+    if v == "" or v is None:
+        return None
+    return v
 
 
 class ProductCreate(BaseModel):
@@ -11,6 +18,18 @@ class ProductCreate(BaseModel):
     inventario: int = 0
     imagenes_originales: list[str] | None = None
 
+    @field_validator("precio", "precio_comparacion", mode="before")
+    @classmethod
+    def _empty_float(cls, v):
+        return _empty_to_none(v)
+
+    @field_validator("inventario", mode="before")
+    @classmethod
+    def _empty_inv(cls, v):
+        if v == "" or v is None:
+            return 0
+        return v
+
 
 class ProductUpdate(BaseModel):
     nombre: str | None = None
@@ -18,6 +37,11 @@ class ProductUpdate(BaseModel):
     precio: float | None = None
     precio_comparacion: float | None = None
     inventario: int | None = None
+
+    @field_validator("precio", "precio_comparacion", "inventario", mode="before")
+    @classmethod
+    def _empty_num(cls, v):
+        return _empty_to_none(v)
 
 
 class ProductContentOut(BaseModel):
