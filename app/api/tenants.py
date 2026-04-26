@@ -131,6 +131,12 @@ async def actualizar_config(
 
     config.smtp_use_tls = data.smtp_use_tls
 
+    # Modelos específicos por proveedor
+    for field in ("claude_model", "gemini_model", "openai_model", "kling_model"):
+        v = getattr(data, field, None)
+        if v:
+            setattr(config, field, v)
+
     # Proveedores IA
     if data.ai_provider in ("claude", "gemini", "openai"):
         config.ai_provider = data.ai_provider
@@ -180,6 +186,10 @@ def _config_to_out(config: TenantConfig) -> TenantConfigOut:
         smtp_use_tls=config.smtp_use_tls,
         ai_provider=config.ai_provider or "claude",
         video_provider=config.video_provider or "kling",
+        claude_model=config.claude_model or "claude-sonnet-4-6",
+        gemini_model=config.gemini_model or "gemini-2.5-flash",
+        openai_model=config.openai_model or "gpt-4o-mini",
+        kling_model=config.kling_model or "kling-v1-6",
         tiene_anthropic_key=bool(config.anthropic_api_key_enc),
         tiene_gemini_key=bool(config.gemini_api_key_enc),
         tiene_openai_key=bool(config.openai_api_key_enc),

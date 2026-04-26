@@ -49,7 +49,13 @@ class TenantConfigIn(BaseModel):
 
     # IA — selección de proveedor
     ai_provider: str | None = None       # claude | gemini | openai
-    video_provider: str | None = None    # kling | heygen
+    video_provider: str | None = None    # kling | heygen | higgsfield
+
+    # IA — modelo específico
+    claude_model: str | None = None
+    gemini_model: str | None = None
+    openai_model: str | None = None
+    kling_model: str | None = None
 
     # IA — claves propias del tenant (opcionales, cifradas al guardar)
     anthropic_api_key: str | None = None
@@ -84,9 +90,13 @@ class TenantConfigOut(BaseModel):
     smtp_use_tls: bool = True
     waba_verify_token: str | None = None
 
-    # IA — proveedores seleccionados
+    # IA — proveedores y modelos seleccionados
     ai_provider: str = "claude"
     video_provider: str = "kling"
+    claude_model: str = "claude-sonnet-4-6"
+    gemini_model: str = "gemini-2.5-flash"
+    openai_model: str = "gpt-4o-mini"
+    kling_model: str = "kling-v1-6"
 
     # Indicadores de si la key está configurada (nunca devolvemos el valor real)
     tiene_anthropic_key: bool = False

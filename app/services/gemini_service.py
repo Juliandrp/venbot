@@ -1,11 +1,13 @@
-"""Generación de contenido IA via Gemini 2 Flash."""
+"""Generación de contenido IA via Gemini Flash."""
 import json
 import mimetypes
 from tenacity import retry, stop_after_attempt, wait_exponential
 from app.config import settings
 from app.services.storage import leer_url_como_bytes
 
-MODEL = "gemini-2.0-flash"
+# Modelo Flash más reciente. "gemini-2.0-flash" devuelve 404 desde 2026-Q1.
+# Cambiar a "gemini-2.5-pro" si necesitas mejor calidad (más caro/lento).
+MODEL = "gemini-2.5-flash"
 
 SYSTEM_PROMPT_CONTENIDO = (
     "Eres un experto en marketing digital y copywriting para e-commerce latinoamericano. "
@@ -38,6 +40,7 @@ async def generar_contenido_producto(
     descripcion: str,
     api_key: str | None = None,
     image_urls: list[str] | None = None,
+    model: str | None = None,
 ) -> dict:
     """Genera título SEO, descripción, bullet points y variantes de copy por segmento."""
     client = _get_client(api_key)
@@ -67,7 +70,7 @@ Genera el siguiente JSON (sin markdown, solo el JSON):
         contents.extend(await _leer_partes_imagen(image_urls))
     contents.append(prompt_text)
 
-    response = await client.aio.models.generate_content(model=MODEL, contents=contents)
+    response = await client.aio.models.generate_content(model=model or MODEL, contents=contents)
     text = response.text.strip()
     if text.startswith("```"):
         text = text.split("```")[1]
@@ -81,6 +84,7 @@ async def generar_respuesta_bot(
     historial: list[dict],
     contexto_producto: str,
     api_key: str | None = None,
+    model: str | None = None,
 ) -> tuple[str, float]:
     """Genera respuesta del bot de ventas. Retorna (texto, confianza)."""
     client = _get_client(api_key)
@@ -103,7 +107,7 @@ async def generar_respuesta_bot(
     prompt = f"{system}\n\nConversación:\n{mensajes_txt}\nAsesor:"
 
     response = await client.aio.models.generate_content(
-        model=MODEL,
+        model=model or MODEL,
         contents=prompt,
     )
     text = response.text.strip()

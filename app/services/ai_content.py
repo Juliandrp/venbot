@@ -37,6 +37,7 @@ async def generar_contenido_producto(
     descripcion: str,
     api_key: str | None = None,
     image_urls: list[str] | None = None,
+    model: str | None = None,
 ) -> dict:
     """Genera título SEO, descripción, bullet points y variantes de copy por segmento."""
     client = _get_client(api_key)
@@ -72,7 +73,7 @@ Genera el siguiente JSON (sin markdown, solo el JSON):
     content.append({"type": "text", "text": prompt_text})
 
     message = client.messages.create(
-        model="claude-sonnet-4-6",
+        model=model or "claude-sonnet-4-6",
         max_tokens=2048,
         system=SYSTEM_PROMPT_CONTENIDO,
         messages=[{"role": "user", "content": content}],
@@ -88,6 +89,7 @@ async def generar_respuesta_bot(
     historial: list[dict],
     contexto_producto: str,
     api_key: str | None = None,
+    model: str | None = None,
 ) -> tuple[str, float]:
     """Genera respuesta del bot de ventas. Retorna (texto, confianza)."""
     client = _get_client(api_key)
@@ -110,7 +112,7 @@ Responde SIEMPRE en JSON con esa estructura."""
     messages = [{"role": m["rol"], "content": m["contenido"]} for m in historial[-20:]]
 
     response = client.messages.create(
-        model="claude-sonnet-4-6",
+        model=model or "claude-sonnet-4-6",
         max_tokens=512,
         system=system,
         messages=messages,

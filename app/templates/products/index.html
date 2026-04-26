@@ -180,12 +180,12 @@
               <!-- En progreso: barra -->
               <div x-show="!p.contenido_generado">
                 <div class="flex items-center justify-between text-xs text-gray-400 mb-1">
-                  <span x-text="['Pendiente','Generando copy...','Generando imágenes...','Procesando video...','Publicando...'][p.pipeline_paso] || 'Generando...'"></span>
-                  <span x-text="[0,25,50,75,90][p.pipeline_paso] + '%'"></span>
+                  <span x-text="['En cola...','Generando copy...','Generando imágenes...','Procesando video...','Publicando...'][p.pipeline_paso || 0]"></span>
+                  <span x-text="([5,25,50,75,90][p.pipeline_paso || 0]) + '%'"></span>
                 </div>
                 <div class="h-1.5 bg-gray-800 rounded-full overflow-hidden w-32">
                   <div class="h-full bg-indigo-500 rounded-full transition-all duration-1000 animate-pulse"
-                       :style="'width:' + ([5,25,50,75,90][p.pipeline_paso] || 5) + '%'"></div>
+                       :style="'width:' + ([5,25,50,75,90][p.pipeline_paso || 0]) + '%'"></div>
                 </div>
               </div>
             </td>
@@ -330,7 +330,8 @@
           this.progreso = 100;
           this.mensajeProgreso = '¡Listo! Contenido en proceso de generación.';
           await new Promise(r => setTimeout(r, 600));
-          this.cerrarModal();
+          // Cerrar directamente — cerrarModal() ignora cuando subiendo=true
+          this.modalNuevo = false;
           await this.cargar();
         } catch (e) {
           this.error = 'Error de conexión: ' + e.message;
