@@ -87,22 +87,41 @@
       <div x-show="seleccionada && seleccionada.estado !== 'cerrada'"
            class="border-t border-gray-800 p-3 bg-gray-900">
         <div x-show="errorEnvio" class="mb-2 text-xs text-red-400" x-text="errorEnvio"></div>
-        <div class="flex gap-2 items-end">
-          <textarea x-model="textoRespuesta" rows="2"
-                    @keydown.enter.prevent.exact="enviar()"
-                    placeholder="Escribe tu respuesta como agente humano... (Enter para enviar, Shift+Enter para nueva línea)"
-                    :disabled="enviando"
-                    class="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 text-sm resize-none disabled:opacity-50"></textarea>
-          <button @click="enviar()" :disabled="enviando || !textoRespuesta.trim()"
-                  class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
-                  x-text="enviando ? 'Enviando...' : 'Enviar'"></button>
+        <textarea x-model="textoRespuesta" rows="2"
+                  @keydown.enter.prevent.exact="enviar(false)"
+                  :placeholder="seleccionada?.estado === 'transferida' ? 'Tienes el control. Escribe tu respuesta...' : 'Escribe tu respuesta. Asistir = el bot sigue respondiendo. Tomar control = solo tú respondes.'"
+                  :disabled="enviando"
+                  class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 text-sm resize-none disabled:opacity-50 mb-2"></textarea>
+
+        <div class="flex gap-2 items-center">
+          <!-- Botón Asistir (primario) -->
+          <button @click="enviar(false)" :disabled="enviando || !textoRespuesta.trim()"
+                  class="flex-1 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  title="Tu mensaje sale al cliente, el bot sigue respondiendo después con tu mensaje como contexto">
+            <span>✏️</span>
+            <span x-text="enviando ? 'Enviando...' : 'Asistir (bot sigue activo)'"></span>
+          </button>
+
+          <!-- Botón Tomar control (secundario) -->
+          <button @click="enviar(true)" :disabled="enviando || !textoRespuesta.trim()"
+                  class="px-4 py-2.5 bg-gray-800 hover:bg-yellow-700 text-gray-300 hover:text-white text-sm font-medium rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 flex-shrink-0"
+                  title="Tomas el control completo. El bot deja de responder hasta cerrar la conversación.">
+            <span>🤝</span>
+            <span class="hidden sm:inline">Tomar control</span>
+          </button>
+
+          <!-- Cerrar conversación -->
           <button @click="cerrar()" :disabled="enviando" title="Cerrar conversación"
                   class="px-3 py-2.5 bg-gray-800 hover:bg-red-700 text-gray-400 hover:text-white text-sm rounded-xl transition-colors flex-shrink-0">
             ✕
           </button>
         </div>
-        <p class="text-xs text-gray-600 mt-1.5">
-          Al responder, la conversación pasa a estado <strong>transferida</strong> (el bot deja de responder automáticamente).
+
+        <p x-show="seleccionada?.estado !== 'transferida'" class="text-xs text-gray-600 mt-2">
+          💡 <strong>Asistir</strong>: el bot ve tu mensaje en el historial y lo usa como guía para responder los siguientes mensajes del cliente.
+        </p>
+        <p x-show="seleccionada?.estado === 'transferida'" class="text-xs text-yellow-500 mt-2">
+          ⚠️ Conversación <strong>transferida</strong>. El bot no responderá hasta que cierres esta conversación.
         </p>
       </div>
       <div x-show="seleccionada && seleccionada.estado === 'cerrada'"
@@ -149,13 +168,13 @@
         });
       },
 
-      async enviar() {
+      async enviar(tomarControl = false) {
         const texto = this.textoRespuesta.trim();
         if (!texto || !this.seleccionada || this.enviando) return;
         this.enviando = true; this.errorEnvio = '';
         const resp = await apiFetch('/bot/conversaciones/' + this.seleccionada.id + '/responder', {
           method: 'POST',
-          body: JSON.stringify({ texto }),
+          body: JSON.stringify({ texto, tomar_control: tomarControl }),
         });
         if (resp && resp.ok) {
           const msg = await resp.json();
@@ -164,7 +183,10 @@
             confianza: null, created_at: msg.created_at,
           });
           this.textoRespuesta = '';
-          this.seleccionada.estado = 'transferida';
+          // Reflejar el estado real que devolvió el backend
+          if (msg.estado_conversacion) {
+            this.seleccionada.estado = msg.estado_conversacion;
+          }
           if (msg.error) this.errorEnvio = msg.error + ' (mensaje guardado pero no enviado al canal)';
           this._scrollDown();
         } else if (resp) {
