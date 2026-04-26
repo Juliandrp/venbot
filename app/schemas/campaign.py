@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from app.models.campaign import CampaignStatus
 
 
@@ -12,6 +12,20 @@ class CampaignCreate(BaseModel):
     cpc_maximo: float | None = None
     fecha_inicio: datetime | None = None
     fecha_fin: datetime | None = None
+
+    @field_validator("product_id", "roas_minimo", "cpc_maximo", "fecha_inicio", "fecha_fin", mode="before")
+    @classmethod
+    def _empty_to_none(cls, v):
+        if v == "" or v is None:
+            return None
+        return v
+
+    @field_validator("presupuesto_diario", mode="before")
+    @classmethod
+    def _empty_default(cls, v):
+        if v == "" or v is None:
+            return 10.0
+        return v
 
 
 class CampaignOut(BaseModel):
